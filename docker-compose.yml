@@ -1,0 +1,52 @@
+# 校园美食社交平台 · 开发/演示编排
+# 一键启动：docker compose up -d
+# 包含 MySQL 8 + Flask 后端 + Vue 前端（Nginx 托管）
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: campus-food-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-campus-demo-pass}
+      MYSQL_DATABASE: campus_food
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-campus-demo-pass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: campus-food-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SQLALCHEMY_DATABASE_URI: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-campus-demo-pass}@mysql:3306/campus_food?charset=utf8mb4
+      SECRET_KEY: campus-food-docker-secret
+      JWT_SECRET_KEY: campus-food-docker-jwt-secret
+      CORS_ORIGINS: http://localhost
+    ports:
+      - "5000:5000"
+    command: gunicorn -w 2 -b 0.0.0.0:5000 "app:create_app()"
+
+  frontend:
+    build: ./frontend
+    container_name: campus-food-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  mysql_data:

@@ -1,0 +1,37 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 环境变量（含密钥，不入库）
+.env
+
+# Flask / Flask-Migrate
+instance/
+migrations/versions/*.pyc
+
+# 图片上传（运行时产生的用户内容；仅保留目录占位文件）
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ---- Node ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ---- 日志 ----
+*.log
+
+# ---- 内部文档（仅本地工作文件，不入库，不推送 GitHub）----
+README.md
+docs/
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
