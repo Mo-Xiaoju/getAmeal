@@ -22,11 +22,16 @@ class Shop(db.Model):
     rating_count = db.Column(db.Integer, nullable=False, default=0)       # 评分人数
     image_url = db.Column(db.String(255), nullable=True)                  # 封面图
     is_active = db.Column(db.Boolean, nullable=False, default=True)       # 是否上架（软删除）
+    # 商户/提交者归属；NULL 表示由管理员创建
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    # 审核状态：approved 已通过 | pending 待审核（学生提交）| rejected 已驳回
+    status = db.Column(db.String(20), nullable=False, default='approved', server_default='approved')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # 关系：N:1 学校；1:N 菜品、评价与收藏
+    # 关系：N:1 学校/归属用户；1:N 菜品、评价与收藏
     school = db.relationship('School', back_populates='shops')
+    owner = db.relationship('User', backref='owned_shops')
     dishes = db.relationship('Dish', back_populates='shop', lazy='dynamic')
     reviews = db.relationship('Review', back_populates='shop', lazy='dynamic')
 

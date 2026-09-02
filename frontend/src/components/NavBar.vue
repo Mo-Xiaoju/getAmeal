@@ -49,6 +49,12 @@
                 <el-dropdown-item command="profile">
                   <el-icon><User /></el-icon>个人中心
                 </el-dropdown-item>
+                <el-dropdown-item v-if="userStore.isMerchant" command="merchant">
+                  <el-icon><Shop /></el-icon>商户中心
+                </el-dropdown-item>
+                <el-dropdown-item v-if="!userStore.isMerchant" command="contribute">
+                  <el-icon><EditPen /></el-icon>提交商户 / 菜单
+                </el-dropdown-item>
                 <el-dropdown-item v-if="userStore.isAdmin" command="admin">
                   <el-icon><Setting /></el-icon>管理后台
                 </el-dropdown-item>
@@ -67,7 +73,7 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Bowl, School, Setting, SwitchButton, User } from '@element-plus/icons-vue'
+import { ArrowDown, Bowl, EditPen, School, Setting, Shop, SwitchButton, User } from '@element-plus/icons-vue'
 
 import { useSchoolStore } from '@/store/school'
 import { useUserStore } from '@/store/user'
@@ -82,6 +88,10 @@ const isActive = (path) => (path === '/' ? route.path === '/' : route.path.start
 const handleCommand = async (command) => {
   if (command === 'profile') {
     router.push('/profile')
+  } else if (command === 'merchant') {
+    router.push('/merchant')
+  } else if (command === 'contribute') {
+    router.push('/contribute')
   } else if (command === 'admin') {
     router.push('/admin')
   } else if (command === 'logout') {

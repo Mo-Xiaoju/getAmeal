@@ -2,7 +2,7 @@
 from flask import Blueprint, g, request
 
 from app.services.post_service import PostService
-from app.utils.decorators import optional_login, require_login
+from app.utils.decorators import optional_login, require_consumer, require_login
 from app.utils.responses import ok
 
 bp_post = Blueprint('post', __name__)
@@ -16,9 +16,9 @@ def get_post_list():
 
 
 @bp_post.route('', methods=['POST'], strict_slashes=False)
-@require_login
+@require_consumer
 def create_post():
-    """发布探店笔记（需登录）。"""
+    """发布探店笔记（需学生/管理员，商户不可）。"""
     data = request.get_json(silent=True) or {}
     return ok(PostService.create(g.current_user, data), message='发布成功')
 
@@ -39,24 +39,24 @@ def get_post_detail(post_id):
 
 
 @bp_post.route('/<int:post_id>', methods=['DELETE'])
-@require_login
+@require_consumer
 def delete_post(post_id):
-    """删除自己的笔记（软删除）。"""
+    """删除自己的笔记（软删除，商户不可）。"""
     PostService.delete_post(g.current_user, post_id)
     return ok(None, message='删除成功')
 
 
 @bp_post.route('/<int:post_id>/like', methods=['POST'])
-@require_login
+@require_consumer
 def toggle_like(post_id):
-    """点赞/取消点赞笔记（幂等）。"""
+    """点赞/取消点赞笔记（幂等，商户不可）。"""
     return ok(PostService.toggle_like(g.current_user, post_id))
 
 
 @bp_post.route('/<int:post_id>/favorite', methods=['POST'])
-@require_login
+@require_consumer
 def toggle_favorite(post_id):
-    """收藏/取消收藏笔记（幂等）。"""
+    """收藏/取消收藏笔记（幂等，商户不可）。"""
     return ok(PostService.toggle_favorite(g.current_user, post_id))
 
 
@@ -68,8 +68,8 @@ def get_comments(post_id):
 
 
 @bp_post.route('/<int:post_id>/comments', methods=['POST'])
-@require_login
+@require_consumer
 def add_comment(post_id):
-    """发表评论（需登录）。"""
+    """发表评论（需学生/管理员，商户不可）。"""
     data = request.get_json(silent=True) or {}
     return ok(PostService.add_comment(g.current_user, post_id, data), message='评论成功')

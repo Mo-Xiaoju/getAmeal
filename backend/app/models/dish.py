@@ -19,6 +19,8 @@ class Dish(db.Model):
     avg_rating = db.Column(db.Float, nullable=False, default=0.0)    # 平均评分
     rating_count = db.Column(db.Integer, nullable=False, default=0)  # 评分人数
     is_active = db.Column(db.Boolean, nullable=False, default=True)  # 是否在售（软删除）
+    # 审核状态：approved 已通过 | pending 待审核（学生提交）| rejected 已驳回
+    status = db.Column(db.String(20), nullable=False, default='approved', server_default='approved')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

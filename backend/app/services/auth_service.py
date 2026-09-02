@@ -55,7 +55,7 @@ class AuthService:
         user = User(
             username=username,
             nickname=(data.get('nickname') or username).strip() or username,
-            role='student',
+            role=data.get('role') or 'student',
         )
         if data.get('school_id'):
             user.school_id = cls._validate_school(data['school_id'])

@@ -4,7 +4,7 @@ from flask import Blueprint, g, request
 from app.services.dish_service import DishService
 from app.services.recommend_service import RecommendService
 from app.services.shop_service import ShopService
-from app.utils.decorators import optional_login, require_login
+from app.utils.decorators import optional_login, require_consumer
 from app.utils.responses import ok
 
 bp_shop = Blueprint('shop', __name__)
@@ -46,22 +46,22 @@ def get_shop_reviews(shop_id):
 
 
 @bp_shop.route('/<int:shop_id>/reviews', methods=['POST'])
-@require_login
+@require_consumer
 def add_shop_review(shop_id):
-    """发表评价（需登录）。"""
+    """发表评价（需学生/管理员，商户不可）。"""
     data = request.get_json(silent=True) or {}
     return ok(ShopService.add_review(g.current_user, shop_id, data), message='评价成功')
 
 
 @bp_shop.route('/<int:shop_id>/favorite', methods=['POST'])
-@require_login
+@require_consumer
 def add_favorite(shop_id):
-    """收藏店铺（需登录）。"""
+    """收藏店铺（需学生/管理员，商户不可）。"""
     return ok(ShopService.toggle_favorite(g.current_user, shop_id), message='已收藏')
 
 
 @bp_shop.route('/<int:shop_id>/favorite', methods=['DELETE'])
-@require_login
+@require_consumer
 def remove_favorite(shop_id):
-    """取消收藏（需登录）。"""
+    """取消收藏（需学生/管理员，商户不可）。"""
     return ok(ShopService.toggle_favorite(g.current_user, shop_id), message='已取消收藏')

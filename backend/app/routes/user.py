@@ -3,7 +3,7 @@ from flask import Blueprint, g, request
 
 from app.services.shop_service import ShopService
 from app.services.user_service import UserService
-from app.utils.decorators import require_login
+from app.utils.decorators import require_consumer, require_login
 from app.utils.responses import ok
 
 bp_user = Blueprint('user', __name__)
@@ -34,9 +34,9 @@ def get_followers():
 
 
 @bp_user.route('/<int:user_id>/follow', methods=['POST'])
-@require_login
+@require_consumer
 def toggle_follow(user_id):
-    """关注/取关用户（幂等）。"""
+    """关注/取关用户（幂等，商户不可）。"""
     return ok(UserService.toggle_follow(g.current_user, user_id))
 
 

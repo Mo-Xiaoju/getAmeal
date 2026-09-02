@@ -1,7 +1,10 @@
 """用户认证相关 Schema。"""
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 from app.schemas.school import SchoolSchema
+
+# 用户角色：student 学生 | merchant 商户 | admin 管理员（admin 仅由管理员后台授予）
+ROLES = ('student', 'merchant')
 
 
 class RegisterSchema(Schema):
@@ -11,6 +14,7 @@ class RegisterSchema(Schema):
     password = fields.Str(required=True)
     nickname = fields.Str(required=False, load_default=None)
     school_id = fields.Int(required=False, load_default=None)
+    role = fields.Str(load_default='student', validate=validate.OneOf(ROLES))
 
     class Meta:
         unknown = 'EXCLUDE'

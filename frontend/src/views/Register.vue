@@ -37,6 +37,15 @@
             @keyup.enter="handleRegister"
           />
         </el-form-item>
+        <el-form-item label="账号类型">
+          <el-radio-group v-model="form.role">
+            <el-radio-button label="student">学生</el-radio-button>
+            <el-radio-button label="merchant">商户</el-radio-button>
+          </el-radio-group>
+          <div class="role-tip">
+            商户账号仅可发布和管理自己的食堂与菜单；学生账号可浏览评价、发笔记，也可提交商户/菜单待审核。
+          </div>
+        </el-form-item>
         <div v-if="schoolStore.hasSchool" class="register-school">
           <el-icon><School /></el-icon>
           <span>注册后将绑定「{{ schoolStore.currentSchool.name }}」</span>
@@ -78,6 +87,7 @@ const form = reactive({
   nickname: '',
   password: '',
   confirmPassword: '',
+  role: 'student',
 })
 
 const validateConfirmPassword = (rule, value, callback) => {
@@ -117,6 +127,7 @@ const handleRegister = async () => {
       username: form.username,
       password: form.password,
       nickname: form.nickname,
+      role: form.role,
       school_id: schoolStore.hasSchool ? schoolStore.currentSchool.id : undefined,
     })
     ElMessage.success('注册成功，已自动登录')
@@ -165,6 +176,12 @@ const handleRegister = async () => {
   background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);
   font-size: 13px;
+}
+.role-tip {
+  margin-top: 4px;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.6;
 }
 .auth-submit {
   width: 100%;

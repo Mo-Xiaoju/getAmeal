@@ -74,6 +74,18 @@ const routes = [
     props: { mode: 'followers' },
   },
   {
+    path: '/merchant',
+    name: 'merchant',
+    component: () => import('../views/Merchant.vue'),
+    meta: { title: '商户中心', requiresAuth: true, requiresMerchant: true },
+  },
+  {
+    path: '/contribute',
+    name: 'contribute',
+    component: () => import('../views/Contribute.vue'),
+    meta: { title: '提交商户/菜单', requiresAuth: true },
+  },
+  {
     path: '/chat',
     name: 'chat',
     component: () => import('../views/ChatRoom.vue'),
@@ -118,16 +130,20 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresAuth && !hasToken) {
     return next({ path: '/login', query: { redirect: to.fullPath } })
   }
-  if (to.meta.requiresAdmin) {
-    // 需要管理员权限时拉取一次用户信息
+  if (to.meta.requiresAdmin || to.meta.requiresMerchant) {
+    // 需要管理员/商户权限时拉取一次用户信息
     const userStore = useUserStore()
     try {
       await userStore.fetchUserInfo()
     } catch (e) {
       // token 失效，重定向拦截器会处理
     }
-    if (!userStore.isAdmin) {
+    if (to.meta.requiresAdmin && !userStore.isAdmin) {
       ElMessage.warning('需要管理员权限')
+      return next('/')
+    }
+    if (to.meta.requiresMerchant && !userStore.isMerchant) {
+      ElMessage.warning('需要商户权限')
       return next('/')
     }
   }

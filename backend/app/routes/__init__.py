@@ -1,7 +1,18 @@
 """蓝图注册汇总。"""
 from flask import Flask
 
-from app.routes import admin, auth, chat, dish, post, school, shop, user
+from app.routes import (
+    admin,
+    auth,
+    chat,
+    contribute,
+    dish,
+    merchant,
+    post,
+    school,
+    shop,
+    user,
+)
 
 
 def register_blueprints(app: Flask) -> None:
@@ -14,3 +25,5 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(user.bp_user, url_prefix='/api/user')
     app.register_blueprint(chat.bp_chat, url_prefix='/api/chat')
     app.register_blueprint(admin.bp_admin, url_prefix='/api/admin')
+    app.register_blueprint(merchant.bp_merchant, url_prefix='/api/merchant')
+    app.register_blueprint(contribute.bp_contribute, url_prefix='/api/contribute')

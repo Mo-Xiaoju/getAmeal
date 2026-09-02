@@ -62,6 +62,34 @@ def require_admin(func):
     return wrapper
 
 
+def require_merchant(func):
+    """校验当前用户已登录且角色为 merchant（商户）。"""
+
+    @wraps(func)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        user = _resolve_current_user()
+        if user.role != 'merchant':
+            raise PermissionError(message='需要商户权限', code=4031)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def require_consumer(func):
+    """校验当前用户已登录且不是商户（商户仅允许管理自己的店铺与菜单）。"""
+
+    @wraps(func)
+    @jwt_required()
+    def wrapper(*args, **kwargs):
+        user = _resolve_current_user()
+        if user.role == 'merchant':
+            raise PermissionError(message='商户不可进行此操作', code=4031)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 def optional_login(func):
     """可选登录：携带有效 token 时解析用户，未登录/失效则放行（不抛错）。"""
 

@@ -49,16 +49,16 @@ class PostService:
         if not content:
             raise ValidationError(message='正文不能为空', code=4000)
 
-        shop_id = data.get('shop_id')
-        if shop_id is not None:
-            _get_active_shop(int(shop_id))
+        # 必填关联店铺：笔记必须绑定一个现存在售店铺
+        shop_id = int(data['shop_id'])
+        _get_active_shop(shop_id)
 
         post = Post(
             user_id=user.id,
             title=title[:100],
             content=content,
             images=json.dumps(data.get('images') or [], ensure_ascii=False),
-            shop_id=int(shop_id) if shop_id else None,
+            shop_id=shop_id,
             tags=(data.get('tags') or '').strip()[:200] or None,
         )
         db.session.add(post)

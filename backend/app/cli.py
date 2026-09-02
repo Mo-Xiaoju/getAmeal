@@ -287,13 +287,15 @@ def register_cli(app) -> None:
         created = 0
         for idx, (title, content, tags, shop_idx) in enumerate(post_templates):
             shop = shops[shop_idx % len(shops)] if shops else None
+            if shop is None:
+                continue  # 笔记必须关联店铺，无店铺则跳过
             author = users[idx % len(users)]
             post = Post(
                 user_id=author.id,
                 title=title,
                 content=content,
                 images=json.dumps([f'https://picsum.photos/seed/post-{idx}/800/500'], ensure_ascii=False),
-                shop_id=shop.id if shop else None,
+                shop_id=shop.id,
                 tags=tags,
                 like_count=20 + idx * 7,
                 favorite_count=8 + idx * 3,
@@ -313,3 +315,39 @@ def register_cli(app) -> None:
         db.session.commit()
         total = Post.query.filter_by(is_active=True).count()
         print(f'seed-posts 完成：新增 {created} 篇笔记；当前共 {total} 篇。演示用户密码均为 demo1234。')
+
+    @app.cli.command('seed-merchant')
+    def seed_merchant():
+        """写入演示商户账号并绑定一家店铺（幂等，可重复执行）。"""
+        demo_username = 'merchant'
+        user = User.query.filter_by(username=demo_username).first()
+        if user is None:
+            user = User(username=demo_username, nickname='示例商户', role='merchant')
+            user.set_password('demo1234')
+            db.session.add(user)
+            db.session.flush()
+
+        if Shop.query.filter_by(owner_id=user.id).count() == 0:
+            shop = Shop.query.filter_by(is_active=True).order_by(Shop.id.asc()).first()
+            if shop is None:
+                print('没有可绑定的店铺，请先执行 seed-demo。')
+                return
+            shop.owner_id = user.id
+
+        db.session.commit()
+        owned = Shop.query.filter_by(owner_id=user.id).count()
+        print(f'seed-merchant 完成：演示商户 {demo_username}/demo1234（角色 merchant），已绑定 {owned} 家店铺。')
+
+    @app.cli.command('seed-admin')
+    def seed_admin():
+        """写入演示管理员账号（幂等，可重复执行）。"""
+        username = 'admin'
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            user = User(username=username, nickname='管理员', role='admin')
+            user.set_password('demo1234')
+            db.session.add(user)
+            db.session.commit()
+            print(f'seed-admin 完成：新增演示管理员 {username}/demo1234（角色 admin）。')
+        else:
+            print(f'seed-admin 完成：管理员 {username} 已存在，无需新增。')

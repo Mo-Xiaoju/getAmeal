@@ -75,7 +75,7 @@ class PostCreateSchema(Schema):
     title = fields.Str(required=True)
     content = fields.Str(required=True)
     images = fields.List(fields.Str(), load_default=list)
-    shop_id = fields.Int(load_default=None)
+    shop_id = fields.Int(required=True)  # 必填：笔记必须关联已有店铺
     tags = fields.Str(load_default=None)
 
     class Meta:

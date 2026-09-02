@@ -25,10 +25,17 @@
           <el-input v-model="form.tags" placeholder="例如：食堂,安利,平价" />
         </el-form-item>
 
-        <el-form-item v-if="shopList.length" label="关联店铺（可选）">
-          <el-select v-model="form.shop_id" clearable placeholder="选择你探的这家店" style="width: 320px">
-            <el-option v-for="s in shopList" :key="s.id" :label="s.name" :value="s.id" />
-          </el-select>
+        <el-form-item label="关联店铺（必填）" required>
+          <template v-if="shopList.length">
+            <el-select v-model="form.shop_id" placeholder="选择你探的这家店" style="width: 320px">
+              <el-option v-for="s in shopList" :key="s.id" :label="s.name" :value="s.id" />
+            </el-select>
+          </template>
+          <div v-else class="no-shop-tip">
+            当前学校还没有店铺，请先
+            <router-link to="/choose-school">选择学校</router-link>
+            或返回，无法发布不关联店铺的笔记。
+          </div>
         </el-form-item>
 
         <el-form-item label="图片 URL（可选）">
@@ -93,6 +100,10 @@ const handleSubmit = async () => {
     ElMessage.warning('请填写正文')
     return
   }
+  if (!form.shop_id) {
+    ElMessage.warning('请选择关联店铺')
+    return
+  }
   submitting.value = true
   try {
     const images = form.images.map((s) => s.trim()).filter(Boolean)
@@ -100,7 +111,7 @@ const handleSubmit = async () => {
       title,
       content,
       tags: form.tags.trim() || undefined,
-      shop_id: form.shop_id || undefined,
+      shop_id: form.shop_id,
       images,
     })
     ElMessage.success('发布成功')
@@ -153,5 +164,13 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 8px;
+}
+.no-shop-tip {
+  font-size: 13px;
+  color: #e6a23c;
+  line-height: 1.6;
+}
+.no-shop-tip a {
+  color: var(--el-color-primary);
 }
 </style>

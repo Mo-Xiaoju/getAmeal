@@ -1,6 +1,8 @@
 """管理后台路由（需管理员权限）。"""
-from flask import Blueprint
+from flask import Blueprint, g, request
 
+from app.services.admin_service import AdminService
+from app.utils.decorators import require_admin
 from app.utils.responses import ok
 
 bp_admin = Blueprint('admin', __name__)
@@ -31,15 +33,19 @@ def admin_delete_shop(shop_id):
 
 
 @bp_admin.route('/users', methods=['GET'])
+@require_admin
 def admin_get_users():
-    """用户列表。"""
-    return ok()  # TODO: AdminService.list_users()
+    """用户列表（分页）。"""
+    params = request.args.to_dict()
+    return ok(AdminService.list_users(params))
 
 
 @bp_admin.route('/users/<int:user_id>', methods=['PUT'])
+@require_admin
 def admin_update_user(user_id):
     """修改用户（封禁 / 变更角色）。"""
-    return ok()  # TODO: AdminService.update_user(user_id)
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.update_user(g.current_user, user_id, data), message='已更新')
 
 
 @bp_admin.route('/reviews', methods=['GET'])

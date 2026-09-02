@@ -10,6 +10,7 @@
 
       <div class="profile-meta">
         <el-tag v-if="userStore.isAdmin" type="warning" effect="light">管理员</el-tag>
+        <el-tag v-else-if="userStore.isMerchant" type="success" effect="light">商户</el-tag>
         <el-tag v-else type="info" effect="light">学生</el-tag>
         <span class="profile-time">
           加入于 {{ formatDate(userStore.userInfo?.created_at) }}

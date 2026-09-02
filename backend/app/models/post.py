@@ -14,7 +14,7 @@ class Post(db.Model):
     title = db.Column(db.String(100), nullable=False)                        # 标题
     content = db.Column(db.Text, nullable=False)                             # 正文
     images = db.Column(db.Text, nullable=True)                               # 图片地址（JSON 数组字符串）
-    shop_id = db.Column(db.Integer, db.ForeignKey('shops.id'), nullable=True)  # 关联店铺（可选）
+    shop_id = db.Column(db.Integer, db.ForeignKey('shops.id'), nullable=False)  # 关联店铺（必填）
     tags = db.Column(db.String(200), nullable=True)                          # 标签，逗号分隔
     like_count = db.Column(db.Integer, nullable=False, default=0)            # 点赞数
     favorite_count = db.Column(db.Integer, nullable=False, default=0)        # 收藏数

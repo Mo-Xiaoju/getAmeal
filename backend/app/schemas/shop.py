@@ -18,9 +18,43 @@ class ShopSchema(Schema):
     rating_count = fields.Int()
     address = fields.Str()
     image_url = fields.Str()
+    status = fields.Str()  # approved / pending / rejected
 
     def _school_name(self, obj) -> str:
         return getattr(obj, 'school_name', None) or (obj.school.name if obj.school else None)
+
+
+class ShopCreateSchema(Schema):
+    """新增店铺请求（商户 / 学生提交共用）。"""
+
+    school_id = fields.Int(required=True)
+    name = fields.Str(required=True)
+    address = fields.Str(required=True)
+    description = fields.Str(load_default=None)
+    category = fields.Str(load_default=None)
+    price_range = fields.Str(load_default=None)
+    longitude = fields.Float(load_default=None)
+    latitude = fields.Float(load_default=None)
+    image_url = fields.Str(load_default=None)
+
+    class Meta:
+        unknown = 'EXCLUDE'
+
+
+class ShopUpdateSchema(Schema):
+    """修改店铺请求。"""
+
+    name = fields.Str()
+    address = fields.Str()
+    description = fields.Str()
+    category = fields.Str()
+    price_range = fields.Str()
+    longitude = fields.Float()
+    latitude = fields.Float()
+    image_url = fields.Str()
+
+    class Meta:
+        unknown = 'EXCLUDE'
 
 
 class ShopDetailSchema(ShopSchema):
