@@ -56,15 +56,3 @@ class DishService:
     def get_detail(dish_id: int) -> dict:
         """菜品详情。"""
         return _dish_schema.dump(_get_active_dish(dish_id))
-
-    # ---- 推荐 ----
-    @staticmethod
-    def recommend(params: dict) -> dict:
-        """推荐菜品：当前学校内按评分/人气取 Top N。"""
-        query = Dish.query.join(Shop).filter(Dish.is_active.is_(True), Shop.is_active.is_(True))
-        school_id = params.get('school_id')
-        if school_id:
-            query = query.filter(Shop.school_id == int(school_id))
-        limit = min(int(params.get('limit') or 6), 20)
-        items = query.order_by(Dish.avg_rating.desc(), Dish.rating_count.desc(), Dish.id.desc()).limit(limit).all()
-        return {'items': _dish_list_schema.dump(items)}

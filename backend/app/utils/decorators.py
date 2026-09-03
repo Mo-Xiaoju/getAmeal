@@ -95,10 +95,12 @@ def optional_login(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
+        g.current_user = None  # 游客恒为 None，避免下游读 g.current_user 抛错
         try:
             verify_jwt_in_request(optional=True)
             if get_jwt_identity() is not None:
-                g.current_user = db.session.get(User, int(get_jwt_identity()))
+                user = db.session.get(User, int(get_jwt_identity()))
+                g.current_user = user if (user is not None and user.is_active) else None
         except Exception:
             g.current_user = None
         return func(*args, **kwargs)

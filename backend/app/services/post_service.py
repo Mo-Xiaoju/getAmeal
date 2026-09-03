@@ -1,5 +1,6 @@
 """探店笔记业务逻辑：发布、浏览、点赞、收藏、评论。"""
 import json
+import math
 
 from app.extensions import db
 from app.models import Comment, Favorite, Like, Post, Shop
@@ -10,6 +11,7 @@ from app.schemas.post import (
     PostDetailSchema,
     PostSchema,
 )
+from app.services.recommend_service import RecommendService
 from app.utils.exceptions import NotFoundError, PermissionError, ValidationError
 from app.utils.pagination import paginate
 
@@ -76,8 +78,14 @@ class PostService:
 
     # ---- 列表与详情 ----
     @staticmethod
-    def list(params: dict) -> dict:
-        """笔记列表：school_id / keyword 过滤，newest / hot 排序，分页。"""
+    def list(params: dict, user=None) -> dict:
+        """笔记列表：school_id / keyword 过滤，newest / hot / recommend 排序，分页。
+
+        recommend 仅首页推荐流使用（走打分引擎 rank_posts）；其余分支语义保持不变。
+        """
+        if params.get('sort') == 'recommend':
+            return PostService._list_recommend(params, user)
+
         query = Post.query.filter_by(is_active=True)
         school_id = params.get('school_id')
         if school_id:
@@ -103,6 +111,32 @@ class PostService:
         page_size = int(params.get('page_size') or 10)
         result = paginate(query, page, page_size)
         return {**result, 'items': _post_list_schema.dump(result['items'])}
+
+    @staticmethod
+    def _list_recommend(params: dict, user=None) -> dict:
+        """首页推荐流分支：整池打分排序后再做内存分页切片（保证翻页顺序稳定）。"""
+        posts, reasons = RecommendService.rank_posts(user, params)
+
+        try:
+            page = int(params.get('page') or 1)
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            page_size = int(params.get('page_size') or 10)
+        except (TypeError, ValueError):
+            page_size = 10
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 20)
+
+        total = len(posts)
+        total_pages = math.ceil(total / page_size) if total else 0
+        start = (page - 1) * page_size
+        chunk = posts[start:start + page_size]
+        items = _post_list_schema.dump(chunk)
+        for item, reason in zip(items, reasons[start:start + page_size]):
+            item['rec_reason'] = reason
+        return {'items': items, 'total': total, 'page': page,
+                'page_size': page_size, 'total_pages': total_pages}
 
     @staticmethod
     def list_my_posts(user, params: dict) -> dict:

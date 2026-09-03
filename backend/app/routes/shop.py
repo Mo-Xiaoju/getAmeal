@@ -18,10 +18,11 @@ def get_shop_list():
 
 
 @bp_shop.route('/recommend', methods=['GET'])
+@optional_login
 def get_recommend():
-    """推荐店铺：当前学校内按评分/人气（可选按距离）。"""
+    """推荐店铺：校内 approved+active；登录且有足够行为则轻个性化，否则改进热门榜。"""
     params = request.args.to_dict()
-    return ok(RecommendService.recommend(params))
+    return ok(RecommendService.shops(g.current_user, params))
 
 
 @bp_shop.route('/<int:shop_id>/dishes', methods=['GET'])

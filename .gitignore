@@ -29,6 +29,8 @@ dist-ssr/
 # ---- 内部文档（仅本地工作文件，不入库，不推送 GitHub）----
 README.md
 docs/
+原理解释.md
+首页推荐流算法设计.md
 
 # ---- IDE / 系统 ----
 .idea/

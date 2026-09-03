@@ -18,6 +18,10 @@
       <img :src="post.images[0]" :alt="post.title" loading="lazy" @error="imageFailed = true" />
     </div>
 
+    <div v-if="post.rec_reason && post.rec_reason.length" class="rec-reason">
+      <el-tag v-for="(r, i) in post.rec_reason" :key="i" type="warning" size="small" effect="plain">{{ r }}</el-tag>
+    </div>
+
     <div class="post-foot">
       <div v-if="post.tags && post.tags.length" class="post-tags">
         <el-tag v-for="t in post.tags.slice(0, 3)" :key="t" size="small" effect="plain">{{ t }}</el-tag>
@@ -116,6 +120,12 @@ const goDetail = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.rec-reason {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 .post-foot {
   display: flex;

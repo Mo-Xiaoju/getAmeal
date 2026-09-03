@@ -24,6 +24,9 @@
       <p v-if="shop.address" class="shop-address">
         <el-icon><Location /></el-icon>{{ shop.address }}
       </p>
+      <div v-if="shop.rec_reason && shop.rec_reason.length" class="rec-reason">
+        <el-tag v-for="(r, i) in shop.rec_reason" :key="i" type="warning" size="small" effect="plain">{{ r }}</el-tag>
+      </div>
     </div>
   </div>
 </template>
@@ -124,5 +127,11 @@ const goDetail = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.rec-reason {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
 }
 </style>

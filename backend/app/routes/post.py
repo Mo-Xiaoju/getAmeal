@@ -9,10 +9,11 @@ bp_post = Blueprint('post', __name__)
 
 
 @bp_post.route('', methods=['GET'], strict_slashes=False)
+@optional_login
 def get_post_list():
-    """笔记列表：school_id / keyword 过滤，newest / hot 排序，分页。"""
+    """笔记列表：school_id / keyword 过滤，newest / hot / recommend 排序，分页。"""
     params = request.args.to_dict()
-    return ok(PostService.list(params))
+    return ok(PostService.list(params, user=g.current_user))
 
 
 @bp_post.route('', methods=['POST'], strict_slashes=False)

@@ -60,10 +60,10 @@
       />
     </section>
 
-    <!-- 最新笔记 -->
+    <!-- 推荐笔记 -->
     <section v-if="schoolStore.hasSchool" class="recommend">
       <div class="recommend-head">
-        <h2 class="section-title">{{ schoolStore.currentSchool.name }} · 最新探店笔记</h2>
+        <h2 class="section-title">{{ schoolStore.currentSchool.name }} · 推荐探店笔记</h2>
         <el-button text type="primary" @click="router.push('/posts')">查看全部 →</el-button>
       </div>
       <div v-loading="postStore.loading" class="post-grid">
@@ -123,7 +123,7 @@ onMounted(async () => {
   if (schoolStore.hasSchool) {
     shopStore.fetchRecommend({ school_id: schoolStore.currentSchool.id, page_size: 6 })
     dishStore.fetchRecommend({ school_id: schoolStore.currentSchool.id, limit: 6 })
-    postStore.fetchList({ school_id: schoolStore.currentSchool.id, page_size: 3 })
+    postStore.fetchList({ school_id: schoolStore.currentSchool.id, page_size: 3, sort: 'recommend' })
   }
 })
 </script>

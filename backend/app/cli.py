@@ -7,10 +7,12 @@
   flask seed-merchant    # 写入演示商户账号并绑定一家店铺
   flask seed-admin       # 写入演示管理员账号
   flask seed-circles     # 写入演示圈子 + 圈内群聊/私信/全校群聊消息
+  flask seed-rec-demo    # 写入首页推荐流演示数据：独立虚拟学校 + 口味账号 + 店铺/菜品/笔记/行为
   flask import-schools   # 从 data/schools.json 全量导入全国高校名单
 """
 import json
 import os
+from datetime import datetime, timedelta
 
 from app.extensions import db
 from app.models import (
@@ -18,12 +20,15 @@ from app.models import (
     CircleMembership,
     Comment,
     Dish,
+    Favorite,
     Like,
     Message,
     Post,
+    Review,
     School,
     Shop,
     User,
+    UserFollow,
 )
 
 
@@ -457,3 +462,196 @@ def register_cli(app) -> None:
             f'seed-circles 完成：新增 {total_circles} 个圈子、{len(users)} 名成员绑定，'
             f'{created} 条消息；当前消息共 {total_messages} 条。'
         )
+
+    @app.cli.command('seed-rec-demo')
+    def seed_rec_demo():
+        """写入首页推荐流（A+B 算法）演示数据：独立虚拟学校 + 口味账号 + 店铺/菜品/笔记/行为（幂等）。"""
+        if School.query.filter_by(name='虚拟演示大学').first() is not None:
+            print('检测到虚拟演示大学已存在，跳过 seed-rec-demo。')
+            return
+
+        school = School(name='虚拟演示大学', address='演示用虚拟校区')
+        db.session.add(school)
+        db.session.flush()
+        now = datetime.utcnow()
+
+        def days_ago(days):
+            return now - timedelta(days=float(days))
+
+        # ---- 演示用户（密码统一 demo1234，全部绑定虚拟校）----
+        def make_user(username, nickname):
+            user = User(username=username, nickname=nickname, role='student', school_id=school.id)
+            user.set_password('demo1234')
+            db.session.add(user)
+            db.session.flush()
+            return user
+
+        author1 = make_user('rec_author1', '川味探店佬')   # 川菜店主 + 作者
+        author2 = make_user('rec_author2', '奶茶测评员')   # 奶茶店主 + 作者
+        author3 = make_user('rec_author3', '食堂情报员')   # 食堂/甜品作者
+        spicy = make_user('rec_spicy', '无辣不欢')         # 川菜口味账号
+        milk = make_user('rec_milk', '奶茶续命')           # 奶茶口味账号
+        cold = make_user('rec_cold', '新来的小透明')       # 零行为（冷启动对照组）
+        ghost = make_user('rec_ghost', '幽灵评审员')       # 给陷阱店刷出那唯一一条 5.0 评分
+
+        # ---- 店铺（is_active=True / status=approved 之外设两个反例店验证过滤）----
+        shops = []
+
+        def make_shop(name, category, rating, count, created_days, owner=None,
+                      status='approved', active=True, price='10-20元'):
+            shop = Shop(
+                school_id=school.id,
+                name=name,
+                category=category,
+                price_range=price,
+                address=f'{school.name}·{name}',
+                avg_rating=rating,
+                rating_count=count,
+                image_url=f'https://picsum.photos/seed/vshop-{len(shops) + 1}/400/300',
+                created_at=days_ago(created_days),
+                owner_id=owner.id if owner else None,
+                status=status,
+                is_active=active,
+            )
+            db.session.add(shop)
+            db.session.flush()
+            shops.append(shop)
+            return shop
+
+        dining = make_shop('虚拟第一食堂', '食堂', 4.8, 350, 1)                        # 校内热度第一
+        laojie = make_shop('虚拟老街川菜馆', '川菜', 4.5, 120, 12, owner=author1)       # 川菜（店主被 spicy 关注）
+        bashu = make_shop('虚拟巴蜀小厨', '川菜', 4.4, 90, 20, owner=author1)
+        maocai = make_shop('虚拟川香冒菜', '川菜', 4.6, 70, 8)
+        naigai = make_shop('虚拟奶盖研究所', '奶茶', 4.6, 100, 6, owner=author2)        # 奶茶（店主被 milk 关注）
+        boba = make_shop('虚拟波霸奶茶', '奶茶', 4.5, 80, 18, owner=author2)
+        yikoutian = make_shop('虚拟一口甜奶茶', '奶茶', 4.4, 60, 30)
+        salad = make_shop('虚拟轻食沙拉坊', '轻食', 0.0, 0, 2)                          # 陷阱店：0 评起，由幽灵评审刷到 5.0/1
+        dessert = make_shop('虚拟港岛甜品', '甜品', 4.7, 150, 25)                      # 高人气干扰项
+        make_shop('虚拟待审烧烤摊', '烧烤', 5.0, 1, 1, status='pending')               # 反例：待审核必须被排除
+        make_shop('虚拟已下架面馆', '面食', 4.9, 500, 40, active=False)                # 反例：下架必须被排除
+
+        # 幽灵评审给陷阱店刷那一条 5.0（用服务层公式从 0 起步，保证 review 行与均分一致）
+        salad.rating_count += 1
+        salad.avg_rating = (salad.avg_rating * (salad.rating_count - 1) + 5) / salad.rating_count
+        db.session.add(Review(user_id=ghost.id, shop_id=salad.id, rating=5, content='新店试吃，环境干净味道在线。'))
+
+        # ---- 菜品：tags 用规范 token；奶茶店 avg 压低让「父店偏好 + 标签重合」主导 ----
+        dish_defs = {
+            dining: [
+                ('红烧肉盖饭', 15.0, '招牌,下饭', 4.7, 180, 2),
+                ('番茄炒蛋套餐', 12.0, '清淡,家常', 4.5, 120, 5),
+            ],
+            laojie: [
+                ('水煮牛肉', 32.0, '辣,招牌', 4.6, 90, 4),
+                ('麻婆豆腐', 16.0, '辣,下饭', 4.4, 70, 9),
+            ],
+            bashu: [
+                ('辣子鸡', 26.0, '辣,招牌', 4.5, 60, 7),
+                ('回锅肉', 22.0, '辣,家常', 4.3, 50, 14),
+            ],
+            maocai: [
+                ('麻辣冒菜', 18.0, '辣,冒菜', 4.6, 40, 6),
+                ('番茄冒菜', 18.0, '清淡,冒菜', 4.2, 30, 11),
+            ],
+            naigai: [
+                ('黑糖珍珠奶茶', 14.0, '珍珠,奶茶,招牌', 4.4, 80, 3),
+                ('芝士奶盖茶', 16.0, '奶盖,奶茶', 4.3, 60, 6),
+            ],
+            boba: [
+                ('波霸招牌奶茶', 15.0, '珍珠,奶茶,招牌', 4.4, 70, 5),
+                ('冰淇淋椰奶', 13.0, '冰饮,奶茶', 4.2, 40, 10),
+            ],
+            yikoutian: [
+                ('一口甜珍奶', 12.0, '珍珠,奶茶', 4.3, 50, 9),
+                ('抹茶拿铁奶茶', 15.0, '奶盖,奶茶', 4.1, 30, 15),
+            ],
+            salad: [
+                ('鸡胸肉轻食沙拉', 18.0, '低卡,轻食', 4.6, 1, 2),
+            ],
+            dessert: [
+                ('杨枝甘露', 18.0, '招牌,冰饮', 4.7, 90, 8),
+                ('港式双皮奶', 12.0, '甜品,经典', 4.5, 70, 12),
+            ],
+        }
+        dish_count = 0
+        for shop, defs in dish_defs.items():
+            for name, price, tags, avg, count, created_days in defs:
+                db.session.add(Dish(
+                    shop_id=shop.id,
+                    name=name,
+                    price=price,
+                    tags=tags,
+                    avg_rating=avg,
+                    rating_count=count,
+                    description=f'{shop.name}招牌',
+                    image_url=f'https://picsum.photos/seed/vdish-{len(dish_defs)}{name}/400/300',
+                    created_at=days_ago(created_days),
+                ))
+                dish_count += 1
+
+        # ---- 探店笔记（作者/热度/新旧错开；tags 为规范 token 供画像标签重合）----
+        post_defs = [
+            (author3, dining, '食堂中午永远排队的红烧肉，真香', '食堂,实惠,下饭', 90, 30, 10, 0.5),
+            (author1, laojie, '老街川菜的水煮牛肉，重口星人狂喜', '川菜,重辣,下饭', 40, 15, 5, 3),
+            (author1, bashu, '巴蜀小厨的辣子鸡，酥脆到骨头都能嚼', '川菜,家常', 30, 10, 3, 6),
+            (author3, maocai, '一人食冒菜，麻辣鲜香刚刚好', '川菜,冒菜', 15, 5, 1, 12),
+            (author2, naigai, '奶盖研究所的芝士奶盖茶，咸香不腻', '奶茶,奶盖,冰饮', 70, 25, 8, 2),
+            (author2, boba, '波霸奶茶大测评：黑糖味最正', '珍珠,奶茶', 45, 12, 4, 5),
+            (author3, yikoutian, '一口甜珍奶，校园平价快乐水', '奶茶,招牌', 20, 6, 2, 15),
+            (author3, dessert, '港岛甜品的杨枝甘露，芒果给得很足', '甜品,下午茶,冰饮', 55, 20, 6, 4),
+            (author1, salad, '减脂期友好：这家轻食沙拉意外好吃', '轻食,减脂', 10, 2, 0, 1),
+        ]
+        posts = []
+        for author, shop, title, tags, likes, favs, comments, created_days in post_defs:
+            post = Post(
+                user_id=author.id,
+                shop_id=shop.id,
+                title=title,
+                content=f'{title}——来自 {school.name} 的探店实测。',
+                images=json.dumps([f'https://picsum.photos/seed/vpost-{len(posts)}/800/500'], ensure_ascii=False),
+                tags=tags,
+                like_count=likes,
+                favorite_count=favs,
+                comment_count=comments,
+                created_at=days_ago(created_days),
+            )
+            db.session.add(post)
+            db.session.flush()
+            posts.append(post)
+
+        # ---- 行为（画像证据：收藏店 / 好评店 / 点赞·收藏帖 / 关注作者）----
+        def add_review(user, shop, rating, content='好吃，值得再刷！'):
+            """行为 Review 落库时同步按服务层公式维护店铺均分。"""
+            shop.rating_count += 1
+            shop.avg_rating = (shop.avg_rating * (shop.rating_count - 1) + rating) / shop.rating_count
+            db.session.add(Review(user_id=user.id, shop_id=shop.id, rating=rating, content=content))
+
+        def add_favorite_shop(user, shop):
+            db.session.add(Favorite(user_id=user.id, shop_id=shop.id))
+
+        # rec_spicy（无辣不欢）：川菜偏好
+        add_favorite_shop(spicy, laojie)
+        add_favorite_shop(spicy, bashu)
+        add_review(spicy, maocai, 5, '冒菜香辣过瘾，一个人也能吃得爽。')
+        db.session.add(Like(user_id=spicy.id, post_id=posts[1].id))     # 川菜帖
+        db.session.add(Favorite(user_id=spicy.id, post_id=posts[2].id))  # 川菜帖
+        db.session.add(UserFollow(follower_id=spicy.id, followee_id=author1.id))
+
+        # rec_milk（奶茶续命）：奶茶偏好
+        add_favorite_shop(milk, naigai)
+        add_favorite_shop(milk, boba)
+        add_review(milk, yikoutian, 5, '奶味足、不齁甜，续命神器。')
+        db.session.add(Like(user_id=milk.id, post_id=posts[4].id))      # 奶茶帖
+        db.session.add(Favorite(user_id=milk.id, post_id=posts[5].id))  # 奶茶帖
+        db.session.add(UserFollow(follower_id=milk.id, followee_id=author2.id))
+
+        # rec_cold：零行为（冷启动对照）
+
+        db.session.commit()
+
+        active_shops = Shop.query.filter_by(school_id=school.id, is_active=True, status='approved').count()
+        print(
+            f'seed-rec-demo 完成：学校「{school.name}」+ 7 名演示账号（密码 demo1234）；'
+            f'启用店铺 {active_shops} 家、菜品 {dish_count} 道、笔记 {len(posts)} 篇。'
+        )
+        print('用法：进入首页选「虚拟演示大学」，用 rec_spicy / rec_milk / rec_cold 登录对比三轨推荐差异。')

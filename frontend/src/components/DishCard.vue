@@ -19,6 +19,9 @@
       <div v-if="dish.tags && dish.tags.length" class="dish-tags">
         <el-tag v-for="t in dish.tags.slice(0, 3)" :key="t" size="small" effect="plain">{{ t }}</el-tag>
       </div>
+      <div v-if="dish.rec_reason && dish.rec_reason.length" class="rec-reason">
+        <el-tag v-for="(r, i) in dish.rec_reason" :key="i" type="warning" size="small" effect="plain">{{ r }}</el-tag>
+      </div>
     </div>
   </div>
 </template>
@@ -111,5 +114,11 @@ const goDetail = () => {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.rec-reason {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
 }
 </style>

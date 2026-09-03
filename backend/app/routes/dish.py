@@ -1,17 +1,20 @@
 """菜品相关路由。"""
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from app.services.dish_service import DishService
+from app.services.recommend_service import RecommendService
+from app.utils.decorators import optional_login
 from app.utils.responses import ok
 
 bp_dish = Blueprint('dish', __name__)
 
 
 @bp_dish.route('/recommend', methods=['GET'])
+@optional_login
 def get_dish_recommend():
-    """推荐菜品：当前学校内按评分/人气。"""
+    """推荐菜品：父店校内 approved+active；登录且有画像则按店铺偏好/标签个性化。"""
     params = request.args.to_dict()
-    return ok(DishService.recommend(params))
+    return ok(RecommendService.dishes(g.current_user, params))
 
 
 @bp_dish.route('/<int:dish_id>', methods=['GET'])
