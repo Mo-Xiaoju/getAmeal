@@ -10,6 +10,7 @@
         <router-link to="/" class="nav-link" :class="{ active: isActive('/') }">首页</router-link>
         <router-link to="/shops" class="nav-link" :class="{ active: isActive('/shops') }">店铺</router-link>
         <router-link to="/posts" class="nav-link" :class="{ active: isActive('/posts') }">笔记</router-link>
+        <router-link to="/circles" class="nav-link" :class="{ active: isActive('/circles') }">圈子</router-link>
         <router-link to="/chat" class="nav-link" :class="{ active: isActive('/chat') }">校园群聊</router-link>
       </nav>
 
@@ -36,6 +37,16 @@
 
         <!-- 已登录 -->
         <template v-else>
+          <router-link
+            to="/messages"
+            class="dm-link"
+            :class="{ active: isActive('/messages') }"
+            title="私信"
+          >
+            <el-badge :value="chatStore.unreadCount" :hidden="!chatStore.unreadCount" :max="99">
+              <el-icon class="dm-icon"><ChatLineRound /></el-icon>
+            </el-badge>
+          </router-link>
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="user-trigger">
               <el-avatar :size="30" :src="userStore.userInfo?.avatar_url || undefined">
@@ -71,10 +82,14 @@
 </template>
 
 <script setup>
+import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Bowl, EditPen, School, Setting, Shop, SwitchButton, User } from '@element-plus/icons-vue'
+import {
+  ArrowDown, Bowl, ChatLineRound, EditPen, School, Setting, Shop, SwitchButton, User,
+} from '@element-plus/icons-vue'
 
+import { useChatStore } from '@/store/chat'
 import { useSchoolStore } from '@/store/school'
 import { useUserStore } from '@/store/user'
 
@@ -82,8 +97,37 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const schoolStore = useSchoolStore()
+const chatStore = useChatStore()
 
 const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
+
+// 登录期间轮询未读私信，驱动私信入口红点
+let unreadTimer = null
+const stopUnreadTimer = () => {
+  if (unreadTimer) {
+    clearInterval(unreadTimer)
+    unreadTimer = null
+  }
+}
+watch(
+  () => userStore.isLoggedIn,
+  (logged) => {
+    if (logged) {
+      chatStore.refreshUnread()
+      stopUnreadTimer()
+      unreadTimer = setInterval(() => chatStore.refreshUnread(), 15000)
+    } else {
+      stopUnreadTimer()
+      chatStore.unreadCount = 0
+    }
+  },
+  { immediate: true },
+)
+onMounted(() => {
+  // 挂载时兜底一次（覆盖 watch immediate 时 token 未就绪的边缘情况）
+  if (userStore.isLoggedIn) chatStore.refreshUnread()
+})
+onBeforeUnmount(stopUnreadTimer)
 
 const handleCommand = async (command) => {
   if (command === 'profile') {
@@ -170,6 +214,22 @@ const handleCommand = async (command) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.dm-link {
+  display: inline-flex;
+  align-items: center;
+  color: #606266;
+  padding: 4px 2px;
+  border-radius: 6px;
+}
+.dm-link.active {
+  color: var(--el-color-primary);
+}
+.dm-link:hover {
+  color: var(--el-color-primary);
+}
+.dm-icon {
+  font-size: 20px;
 }
 .school-chip {
   display: inline-flex;

@@ -5,8 +5,10 @@ from app.routes import (
     admin,
     auth,
     chat,
+    circle,
     contribute,
     dish,
+    dm,
     merchant,
     post,
     school,
@@ -24,6 +26,8 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(post.bp_post, url_prefix='/api/posts')
     app.register_blueprint(user.bp_user, url_prefix='/api/user')
     app.register_blueprint(chat.bp_chat, url_prefix='/api/chat')
+    app.register_blueprint(circle.bp_circle, url_prefix='/api/circles')
+    app.register_blueprint(dm.bp_dm, url_prefix='/api/dm')
     app.register_blueprint(admin.bp_admin, url_prefix='/api/admin')
     app.register_blueprint(merchant.bp_merchant, url_prefix='/api/merchant')
     app.register_blueprint(contribute.bp_contribute, url_prefix='/api/contribute')

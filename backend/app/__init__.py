@@ -6,7 +6,7 @@ from flask import Flask
 
 from app import models  # noqa: F401  确保全部模型注册到 db.metadata（迁移/建表依赖）
 from app.config import config_map
-from app.extensions import cors, db, jwt, migrate
+from app.extensions import cors, db, jwt, migrate, sio
 from app.routes import register_blueprints
 
 
@@ -27,9 +27,14 @@ def create_app(config_name: str = 'development') -> Flask:
     migrate.init_app(app, db)
     jwt.init_app(app)
     cors.init_app(app, origins=app.config.get('CORS_ORIGINS', '*'))
+    # SocketIO：threading 模式（开发用 werkzeug + simple-websocket，无需 eventlet/gevent）
+    sio.init_app(app, cors_allowed_origins='*', async_mode='threading')
 
     # ---- 注册蓝图 ----
     register_blueprints(app)
+
+    # ---- 注册 SocketIO 事件 ----
+    from app import socket_events  # noqa: F401  确保 @sio.on 处理器被注册
 
     # ---- 注册全局错误处理器 ----
     from app.errors.handlers import register_error_handlers, register_jwt_handlers

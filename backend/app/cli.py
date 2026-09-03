@@ -4,13 +4,27 @@
   flask seed-demo        # 写入演示用店铺数据（学校需先有数据）
   flask seed-dishes      # 为已有店铺写入演示用菜品
   flask seed-posts       # 写入演示用探店笔记 + 演示用户
+  flask seed-merchant    # 写入演示商户账号并绑定一家店铺
+  flask seed-admin       # 写入演示管理员账号
+  flask seed-circles     # 写入演示圈子 + 圈内群聊/私信/全校群聊消息
   flask import-schools   # 从 data/schools.json 全量导入全国高校名单
 """
 import json
 import os
 
 from app.extensions import db
-from app.models import Comment, Dish, Like, Post, School, Shop, User
+from app.models import (
+    Circle,
+    CircleMembership,
+    Comment,
+    Dish,
+    Like,
+    Message,
+    Post,
+    School,
+    Shop,
+    User,
+)
 
 
 def register_cli(app) -> None:
@@ -351,3 +365,95 @@ def register_cli(app) -> None:
             print(f'seed-admin 完成：新增演示管理员 {username}/demo1234（角色 admin）。')
         else:
             print(f'seed-admin 完成：管理员 {username} 已存在，无需新增。')
+
+    @app.cli.command('seed-circles')
+    def seed_circles():
+        """写入演示圈子 + 圈内群聊/私信/全校群聊消息（幂等，可重复执行）。"""
+        if Circle.query.filter_by(is_active=True).count() > 0:
+            print('已存在圈子数据，跳过 seed-circles。')
+            return
+
+        # 演示学校：优先北大（演示数据所在学校），否则取第一个启用学校
+        school = School.query.filter_by(name='北京大学', is_active=True).first()
+        if school is None:
+            school = School.query.filter_by(is_active=True).order_by(School.id.asc()).first()
+        if school is None:
+            print('没有可用学校，请先执行 seed-demo。')
+            return
+
+        # 演示用户（密码统一 demo1234，绑定该校）
+        demo_users = [
+            ('xiaolin', '美食家小林'),
+            ('ajie', '吃货阿杰'),
+            ('dawang', '干饭大王'),
+        ]
+        users = []
+        for username, nickname in demo_users:
+            user = User.query.filter_by(username=username).first()
+            if user is None:
+                user = User(username=username, nickname=nickname, role='student')
+                user.set_password('demo1234')
+                db.session.add(user)
+                db.session.flush()
+            user.school_id = school.id
+            users.append(user)
+
+        # 三个演示圈子（群）：创建者均为 xiaolin
+        circles_def = [
+            ('夜宵党集结', '深夜觅食小分队，分享学校周边的深夜食堂与宵夜安利。', 'https://picsum.photos/seed/circle-1/600/300'),
+            ('减脂餐打卡', '互相监督健康饮食，晒出你的减脂餐与食堂低卡组合。', 'https://picsum.photos/seed/circle-2/600/300'),
+            ('食堂安利互助会', '哪个窗口最值得排队？新菜品评测交流群。', 'https://picsum.photos/seed/circle-3/600/300'),
+        ]
+        circles = []
+        for i, (name, desc, cover) in enumerate(circles_def):
+            circle = Circle(
+                school_id=school.id,
+                creator_id=users[0].id,
+                name=name,
+                description=desc,
+                cover_url=cover,
+                member_count=len(users),
+            )
+            db.session.add(circle)
+            db.session.flush()
+            circles.append(circle)
+            for u in users:
+                db.session.add(CircleMembership(circle_id=circle.id, user_id=u.id))
+
+        # 圈1 群聊消息
+        group_chat = [
+            (users[0], '今晚 11 点有没有人组队去南门吃烧烤？'),
+            (users[1], '算我一个！上次那家烤鸡翅绝了。'),
+            (users[2], '加一，顺便带杯奶茶。'),
+            (users[0], '好，那就老地方见，不见不散～'),
+        ]
+        # 私信：xiaolin <-> ajie
+        dms = [
+            (users[0], users[1], '你上次推荐的那家生煎在哪来着？'),
+            (users[1], users[0], '南门进去右手边那家，记得趁热吃！'),
+            (users[0], users[1], '收到，明天早餐就它了，谢啦！'),
+            (users[2], users[0], '（未读示例）兄弟，周五要不要一起去探店？'),  # 给 xiaolin 一条未读私信
+        ]
+        # 全校群聊消息
+        school_chat = [
+            (users[0], '有没有同学捡到一张校园卡？名字是李某某。'),
+            (users[1], '看到的话交到一食堂服务台哦。'),
+        ]
+        created = 0
+        for u, content in group_chat:
+            db.session.add(Message(user_id=u.id, circle_id=circles[0].id, content=content))
+            created += 1
+        for sender, recipient, content in dms:
+            db.session.add(Message(user_id=sender.id, recipient_id=recipient.id, content=content))
+            created += 1
+        for u, content in school_chat:
+            db.session.add(Message(user_id=u.id, school_id=school.id, content=content))
+            created += 1
+
+        db.session.commit()
+        total_circles = Circle.query.filter_by(is_active=True).count()
+        total_messages = Message.query.count()
+        print(
+            f'seed-circles 完成：新增 {total_circles} 个圈子、{len(users)} 名成员绑定，'
+            f'{created} 条消息；当前消息共 {total_messages} 条。'
+        )

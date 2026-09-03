@@ -92,6 +92,30 @@ const routes = [
     meta: { title: '校园群聊', requiresAuth: true },
   },
   {
+    path: '/circles',
+    name: 'circle-list',
+    component: () => import('../views/CircleList.vue'),
+    meta: { title: '圈子', requiresAuth: true },
+  },
+  {
+    path: '/circles/:id',
+    name: 'circle-chat',
+    component: () => import('../views/CircleChat.vue'),
+    meta: { title: '圈子群聊', requiresAuth: true },
+  },
+  {
+    path: '/messages',
+    name: 'messages',
+    component: () => import('../views/Messages.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
+  {
+    path: '/messages/:userId',
+    name: 'messages-peer',
+    component: () => import('../views/Messages.vue'),
+    meta: { title: '私信', requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/Login.vue'),

@@ -2,6 +2,8 @@
 
 统一在此导入全部模型，便于 Flask-Migrate / SQLAlchemy 自动发现表结构。
 """
+from app.models.circle import Circle
+from app.models.circle_membership import CircleMembership
 from app.models.comment import Comment
 from app.models.dish import Dish
 from app.models.favorite import Favorite
@@ -16,5 +18,5 @@ from app.models.user import User
 
 __all__ = [
     'User', 'School', 'Shop', 'Dish', 'Review', 'Favorite', 'Message',
-    'Post', 'Comment', 'Like', 'UserFollow',
+    'Post', 'Comment', 'Like', 'UserFollow', 'Circle', 'CircleMembership',
 ]

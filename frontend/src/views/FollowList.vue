@@ -15,16 +15,21 @@
             @{{ u.username }}<template v-if="u.school_name"> · {{ u.school_name }}</template>
           </div>
         </div>
-        <el-button
-          v-if="mode === 'followers'"
-          size="small"
-          :type="u.is_following ? 'info' : 'primary'"
-          plain
-          @click="handleFollow(u)"
-        >
-          {{ u.is_following ? '已关注' : '关注' }}
-        </el-button>
-        <span v-else class="following-badge">已关注</span>
+        <div class="row-actions">
+          <el-button
+            v-if="mode === 'followers'"
+            size="small"
+            :type="u.is_following ? 'info' : 'primary'"
+            plain
+            @click="handleFollow(u)"
+          >
+            {{ u.is_following ? '已关注' : '关注' }}
+          </el-button>
+          <span v-else class="following-badge">已关注</span>
+          <el-button v-if="u.id !== myId" size="small" type="primary" plain @click="sendDm(u)">
+            发私信
+          </el-button>
+        </div>
       </div>
     </div>
     <el-empty v-if="!postStore.loading && !items.length" :description="emptyText" />
@@ -45,6 +50,7 @@ import { useRouter } from 'vue-router'
 
 import Pagination from '@/components/Pagination.vue'
 import { usePostStore } from '@/store/post'
+import { useUserStore } from '@/store/user'
 
 const props = defineProps({
   mode: { type: String, default: 'following' }, // following | followers
@@ -52,6 +58,9 @@ const props = defineProps({
 
 const router = useRouter()
 const postStore = usePostStore()
+const userStore = useUserStore()
+
+const myId = computed(() => userStore.userInfo?.id)
 
 const items = ref([])
 const emptyText = computed(() =>
@@ -76,6 +85,16 @@ const handleFollow = async (u) => {
   } else {
     u.is_following = true
   }
+}
+
+// 发起私信：跳转私信页并带上对端资料，便于首屏会话头展示
+const sendDm = (u) => {
+  const peer = JSON.stringify({
+    nickname: u.nickname || u.username,
+    username: u.username,
+    avatar_url: u.avatar_url,
+  })
+  router.push({ path: `/messages/${u.id}`, query: { peer } })
 }
 
 onMounted(() => loadPage(1))
@@ -125,5 +144,11 @@ onMounted(() => loadPage(1))
 .following-badge {
   font-size: 13px;
   color: #909399;
+}
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>
