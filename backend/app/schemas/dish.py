@@ -1,5 +1,5 @@
 """菜品相关 Schema。"""
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 
 class DishSchema(Schema):
@@ -34,7 +34,7 @@ class DishCreateSchema(Schema):
     tags = fields.List(fields.Str(), load_default=[])
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class DishUpdateSchema(Schema):
@@ -47,4 +47,4 @@ class DishUpdateSchema(Schema):
     tags = fields.List(fields.Str())
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE

@@ -2,7 +2,7 @@
 import json
 
 from flask import g
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 from app.models import Like, UserFollow
 
@@ -79,7 +79,7 @@ class PostCreateSchema(Schema):
     tags = fields.Str(load_default=None)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class CommentSchema(Schema):
@@ -106,4 +106,4 @@ class CommentCreateSchema(Schema):
     content = fields.Str(required=True)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE

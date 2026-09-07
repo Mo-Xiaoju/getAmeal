@@ -1,5 +1,5 @@
 """用户认证相关 Schema。"""
-from marshmallow import Schema, fields, validate
+from marshmallow import EXCLUDE, Schema, fields, validate
 
 from app.schemas.school import SchoolSchema
 
@@ -17,7 +17,7 @@ class RegisterSchema(Schema):
     role = fields.Str(load_default='student', validate=validate.OneOf(ROLES))
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class LoginSchema(Schema):
@@ -27,7 +27,7 @@ class LoginSchema(Schema):
     password = fields.Str(required=True)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class UserSchema(Schema):
@@ -51,7 +51,7 @@ class PasswordChangeSchema(Schema):
     new_password = fields.Str(required=True)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class UpdateMeSchema(Schema):
@@ -62,4 +62,4 @@ class UpdateMeSchema(Schema):
     school_id = fields.Int()
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE

@@ -1,6 +1,6 @@
 """圈子（QQ/微信群）相关 Schema。"""
 from flask import g
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 from app.models import CircleMembership
 
@@ -50,7 +50,7 @@ class CircleCreateSchema(Schema):
     description = fields.Str(load_default=None)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class CircleUpdateSchema(Schema):
@@ -61,4 +61,4 @@ class CircleUpdateSchema(Schema):
     description = fields.Str(load_default=None)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
