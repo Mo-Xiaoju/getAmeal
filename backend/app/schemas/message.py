@@ -1,7 +1,7 @@
 """消息相关 Schema：私信 / 圈子群聊 / 全校群聊共用一套消息结构。"""
 import json
 
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 
 class MessageSchema(Schema):
@@ -48,7 +48,7 @@ class DmSendSchema(Schema):
     content = fields.Str(required=True)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class MessageSendSchema(Schema):
@@ -57,4 +57,4 @@ class MessageSendSchema(Schema):
     content = fields.Str(required=True)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE

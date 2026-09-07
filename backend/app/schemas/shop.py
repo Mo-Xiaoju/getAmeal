@@ -1,6 +1,6 @@
 """店铺与评价相关 Schema。"""
 from flask import g
-from marshmallow import Schema, fields
+from marshmallow import EXCLUDE, Schema, fields
 
 from app.models import Favorite
 
@@ -38,7 +38,7 @@ class ShopCreateSchema(Schema):
     image_url = fields.Str(load_default=None)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class ShopUpdateSchema(Schema):
@@ -54,7 +54,7 @@ class ShopUpdateSchema(Schema):
     image_url = fields.Str()
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class ShopDetailSchema(ShopSchema):
@@ -87,7 +87,7 @@ class ShopQuerySchema(Schema):
     page_size = fields.Int(load_default=10)
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class ReviewSchema(Schema):
@@ -118,7 +118,7 @@ class ReviewCreateSchema(Schema):
     images = fields.List(fields.Str())
 
     class Meta:
-        unknown = 'EXCLUDE'
+        unknown = EXCLUDE
 
 
 class FavoriteSchema(Schema):
