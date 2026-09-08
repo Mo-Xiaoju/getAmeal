@@ -3,10 +3,13 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">管理后台</h1>
+
         <p class="page-desc">用户与店铺统一管理</p>
+
       </div>
       <el-button :icon="Refresh" plain @click="handleRefresh">刷新</el-button>
     </div>
+
 
     <el-tabs v-model="activeTab" type="border-card">
       <!-- 用户管理 -->
@@ -17,6 +20,7 @@
               <span>用户列表</span>
               <span class="panel-hint">可直接修改角色（学生 / 商户 / 管理员）或停用账号</span>
             </div>
+
           </template>
 
           <el-table v-loading="loadingUsers" :data="users" :key="'users-' + users.length" stripe>
@@ -77,6 +81,7 @@
               <el-button type="primary" size="small" @click="openShopDialog()">新增店铺</el-button>
             </div>
           </template>
+
 
           <el-table v-loading="loadingShops" :data="shops" :key="'shops-' + shops.length" stripe>
             <el-table-column prop="id" label="ID" width="70" />
@@ -146,6 +151,7 @@
         <el-button type="primary" @click="submitShop">确定</el-button>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
@@ -164,7 +170,10 @@ import {
 } from '@/api/admin'
 import { useUserStore } from '@/store/user'
 
+import AuditQueue from './AuditQueue.vue'
+
 const userStore = useUserStore()
+const adminTab = ref('users')
 
 // ========== 标签页 ==========
 const activeTab = ref('users')
@@ -357,5 +366,8 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+.admin-tabs {
+  margin-top: 4px;
 }
 </style>

@@ -53,8 +53,8 @@
         />
       </div>
 
-      <!-- 互动栏 -->
-      <div class="action-bar">
+      <!-- 互动栏：商户只读，不渲染点赞/收藏（后端 4031，评论区同理见下） -->
+      <div v-if="!userStore.isMerchant" class="action-bar">
         <el-button
           :type="post.liked ? 'danger' : 'default'"
           :icon="post.liked ? StarFilled : Star"
@@ -82,7 +82,7 @@
       <!-- 评论区 -->
       <section class="comment-section">
         <h2 class="section-title">评论（{{ post.comment_count || 0 }}）</h2>
-        <div class="comment-form">
+        <div v-if="!userStore.isMerchant" class="comment-form">
           <el-input
             v-model="commentText"
             type="textarea"
@@ -137,7 +137,10 @@ const commenting = ref(false)
 const commentsLoading = ref(false)
 
 const isMine = computed(() => userStore.userInfo?.id === post.value.user_id)
-const canFollow = computed(() => userStore.isLoggedIn && !isMine.value && !!post.value.user_id)
+// 关注同样仅学生账号可用（后端 require_consumer），商户不渲染
+const canFollow = computed(
+  () => userStore.isLoggedIn && !userStore.isMerchant && !isMine.value && !!post.value.user_id,
+)
 
 const formatDate = (iso) => {
   if (!iso) return ''

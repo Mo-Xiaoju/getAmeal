@@ -1,9 +1,10 @@
 <template>
   <div class="profile">
     <div class="profile-card">
-      <el-avatar :size="72" :src="userStore.userInfo?.avatar_url || undefined">
-        {{ (userStore.nickname || 'U').charAt(0) }}
-      </el-avatar>
+      <!-- 头像：本地上传优先（URL 备择），保存后即时刷新全局头像 -->
+      <div class="avatar-field">
+        <ImageField v-model="avatarUrl" circle :size="88" :disabled="avatarSaving" />
+      </div>
 
       <h2 class="profile-name">{{ userStore.nickname || userStore.userInfo?.username }}</h2>
       <p class="profile-username">@{{ userStore.userInfo?.username }}</p>
@@ -34,8 +35,14 @@
       </div>
 
       <div class="profile-actions" style="margin-top: 16px">
-        <el-button type="primary" plain @click="router.push('/posts?mine=1')">我的笔记</el-button>
-        <el-button plain @click="router.push('/posts/create')">发布笔记</el-button>
+        <!-- 商户面向"发布/管理店铺"，用商户中心替代学生向的 我的笔记/发布笔记 -->
+        <template v-if="userStore.isMerchant">
+          <el-button type="success" :icon="Shop" @click="router.push('/merchant')">商户中心</el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" plain @click="router.push('/posts?mine=1')">我的笔记</el-button>
+          <el-button plain @click="router.push('/posts/create')">发布笔记</el-button>
+        </template>
       </div>
 
       <el-divider />
@@ -70,8 +77,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School } from '@element-plus/icons-vue'
+import { School, Shop } from '@element-plus/icons-vue'
 
+import ImageField from '@/components/ImageField.vue'
 import { usePostStore } from '@/store/post'
 import { useSchoolStore } from '@/store/school'
 import { useUserStore } from '@/store/user'
@@ -83,7 +91,30 @@ const postStore = usePostStore()
 
 const nickname = ref(userStore.nickname)
 const saving = ref(false)
+const avatarSaving = ref(false)
 const stats = ref({ following: 0, followers: 0, posts: 0 })
+
+// 头像 v-model：值始终来自 store（上传即持久化）；ImageField 内部上传完成后通过 setter 触发保存
+const avatarUrl = computed({
+  get: () => userStore.userInfo?.avatar_url || '',
+  set: (val) => onAvatarChange(val),
+})
+
+async function onAvatarChange(val) {
+  if (avatarSaving.value) return
+  const url = (val || '').trim()
+  if (url === (userStore.userInfo?.avatar_url || '')) return
+  avatarSaving.value = true
+  try {
+    // 空字符串 → 后端存空 = 移除头像
+    await userStore.updateProfile({ avatar_url: url })
+    ElMessage.success(url ? '头像已更新' : '头像已移除')
+  } catch (e) {
+    // 失败时 store 未变，ImageField 预览随 getter 自动回退到旧头像
+  } finally {
+    avatarSaving.value = false
+  }
+}
 
 // 账号绑定的学校（优先本地已选学校，其次账号资料里的学校）
 const boundSchool = computed(
@@ -144,6 +175,10 @@ const handleLogout = async () => {
   border-radius: 16px;
   padding: 40px;
   text-align: center;
+}
+.avatar-field {
+  display: flex;
+  justify-content: center;
 }
 .profile-name {
   margin: 16px 0 4px;

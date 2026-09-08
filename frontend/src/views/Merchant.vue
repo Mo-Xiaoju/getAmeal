@@ -31,6 +31,12 @@
             <span>{{ shop.dish_count }} 道菜</span>
           </div>
           <div class="shop-address">{{ shop.address }}</div>
+          <div v-if="shop.status === 'pending'" class="shop-status-note">
+            待审核：通过前暂不对外公示，你仍可编辑与添加菜品
+          </div>
+          <div v-else-if="shop.status === 'rejected'" class="shop-status-note rejected">
+            已驳回：暂不对外公示，可继续编辑保存
+          </div>
           <div class="shop-actions">
             <el-button size="small" type="primary" plain @click="openDishDrawer(shop)">管理菜单</el-button>
             <el-button size="small" @click="openShopDialog(shop)">编辑</el-button>
@@ -59,8 +65,8 @@
         <el-form-item label="简介">
           <el-input v-model="shopDialog.form.description" type="textarea" :rows="3" />
         </el-form-item>
-        <el-form-item label="封面图 URL">
-          <el-input v-model="shopDialog.form.image_url" placeholder="https://…" />
+        <el-form-item label="封面图">
+          <ImageField v-model="shopDialog.form.image_url" :size="120" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -84,6 +90,9 @@
           </div>
           <el-form-item label="描述">
             <el-input v-model="dishForm.description" maxlength="500" />
+          </el-form-item>
+          <el-form-item label="菜品图">
+            <ImageField v-model="dishForm.image_url" :size="72" />
           </el-form-item>
           <el-form-item label="标签（逗号分隔）">
             <el-input v-model="dishForm.tags" placeholder="例如：招牌,下饭" />
@@ -136,6 +145,7 @@ import {
   updateDish,
   updateShop,
 } from '@/api/merchant'
+import ImageField from '@/components/ImageField.vue'
 import { useSchoolStore } from '@/store/school'
 
 const router = useRouter()
@@ -189,7 +199,8 @@ const handleSaveShop = async () => {
       category: form.category?.trim() || undefined,
       price_range: form.price_range?.trim() || undefined,
       description: form.description?.trim() || undefined,
-      image_url: form.image_url?.trim() || undefined,
+      // '' 可清除已存封面（后端 update 仅在值非 None 时 setattr）
+      image_url: form.image_url?.trim() || '',
     }
     if (form.id) {
       await updateShop(form.id, payload)
@@ -220,7 +231,7 @@ const handleDeleteShop = async (shop) => {
 const dishDrawer = reactive({ show: false, shop: null })
 const dishLoading = ref(false)
 const dishes = ref([])
-const dishForm = reactive({ name: '', price: 0, description: '', tags: '', editId: null })
+const dishForm = reactive({ name: '', price: 0, description: '', tags: '', image_url: '', editId: null })
 
 const openDishDrawer = async (shop) => {
   dishDrawer.shop = shop
@@ -234,6 +245,7 @@ const resetDishForm = () => {
   dishForm.price = 0
   dishForm.description = ''
   dishForm.tags = ''
+  dishForm.image_url = ''
   dishForm.editId = null
 }
 
@@ -258,6 +270,8 @@ const handleAddDish = async () => {
       name: dishForm.name.trim(),
       price: dishForm.price,
       description: dishForm.description?.trim() || undefined,
+      // '' 可清除已存菜品图（后端 update 仅在值非 None 时 setattr）
+      image_url: dishForm.image_url?.trim() || '',
       tags: dishForm.tags ? dishForm.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
     }
     if (dishForm.editId) {
@@ -280,6 +294,7 @@ const openDishEdit = (dish) => {
   dishForm.price = Number(dish.price)
   dishForm.description = dish.description || ''
   dishForm.tags = (dish.tags || []).join(',')
+  dishForm.image_url = dish.image_url || ''
 }
 
 const handleDeleteDish = async (dish) => {
@@ -381,6 +396,15 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.shop-status-note {
+  margin: 6px 16px 0;
+  font-size: 12px;
+  color: #e6a23c;
+  line-height: 1.5;
+}
+.shop-status-note.rejected {
+  color: #f56c6c;
 }
 .shop-actions {
   display: flex;

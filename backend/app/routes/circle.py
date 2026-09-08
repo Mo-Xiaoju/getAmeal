@@ -83,11 +83,12 @@ def get_circle_messages(circle_id):
 @bp_circle.route('/<int:circle_id>/messages', methods=['POST'])
 @require_consumer
 def send_circle_message(circle_id):
-    """发送圈内群聊消息（仅成员，商户不可；socket 断开时的 REST 兜底）。"""
+    """发送圈内群聊消息（仅成员，商户不可；socket 断开时的 REST 兜底）；可附带店铺标注。"""
     data = request.get_json(silent=True) or {}
     content = (data.get('content') or '').strip()
-    if not content:
+    shop_id = data.get('shop_id')
+    if not content and not shop_id:
         raise ValidationError(message='消息内容不能为空', code=4000)
     channel = {'type': 'circle', 'id': circle_id}
-    message = MessageService.send(g.current_user, channel, content)
+    message = MessageService.send(g.current_user, channel, content, None, shop_id)
     return ok(message, message='发送成功')

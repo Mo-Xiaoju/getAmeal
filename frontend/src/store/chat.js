@@ -59,15 +59,25 @@ export const useChatStore = defineStore('chat', {
       return () => listeners.delete(cb)
     },
     // 实时发送（主路径）；离线/超时抛错，由调用方走 REST 兜底
-    async sendLive(channel, content) {
+    // shopId：店铺关联标注（校园/圈子群聊可选）
+    async sendLive(channel, content, shopId) {
       if (!socket || !this.connected) throw new Error('实时通道未连接')
-      const ack = await socket.timeout(6000).emitWithAck('send', { channel, content })
+      const payload = { channel, content }
+      if (shopId) payload.shop_id = shopId
+      const ack = await socket.timeout(6000).emitWithAck('send', payload)
       return ack
     },
     // 加入/退出圈子后同步 socket 房间订阅
     emitCircleJoin(joined, circleId) {
       if (!socket || !this.connected) return
       socket.emit(joined ? 'circle:join' : 'circle:leave', { circle_id: circleId })
+    },
+    // 选择/切换学校后同步全校群聊房间订阅
+    // （connect 时只按登录瞬间绑定的学校入房；登录后选校/换校必须补发，否则全校群聊收不到实时消息）
+    emitSchoolChange(newSchoolId, oldSchoolId) {
+      if (!socket || !this.connected) return
+      if (oldSchoolId && oldSchoolId !== newSchoolId) socket.emit('school:leave', { school_id: oldSchoolId })
+      if (newSchoolId) socket.emit('school:join', { school_id: newSchoolId })
     },
     // 以服务端为准刷新未读数
     async refreshUnread() {

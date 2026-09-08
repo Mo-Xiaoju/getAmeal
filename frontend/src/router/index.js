@@ -33,7 +33,7 @@ const routes = [
     path: '/posts/create',
     name: 'post-create',
     component: () => import('../views/PostCreate.vue'),
-    meta: { title: '发布笔记', requiresAuth: true },
+    meta: { title: '发布笔记', requiresAuth: true, requiresConsumer: true },
   },
   {
     path: '/posts/:id',
@@ -83,7 +83,7 @@ const routes = [
     path: '/contribute',
     name: 'contribute',
     component: () => import('../views/Contribute.vue'),
-    meta: { title: '提交商户/菜单', requiresAuth: true },
+    meta: { title: '提交商户/菜单', requiresAuth: true, requiresConsumer: true },
   },
   {
     path: '/chat',
@@ -154,13 +154,16 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresAuth && !hasToken) {
     return next({ path: '/login', query: { redirect: to.fullPath } })
   }
-  if (to.meta.requiresAdmin || to.meta.requiresMerchant) {
-    // 需要管理员/商户权限时拉取一次用户信息
+  const needRole = to.meta.requiresAdmin || to.meta.requiresMerchant || to.meta.requiresConsumer
+  if (needRole) {
+    // 涉及角色权限的路由先确保账号资料已加载（刷新直达时 userInfo 可能为空）
     const userStore = useUserStore()
-    try {
-      await userStore.fetchUserInfo()
-    } catch (e) {
-      // token 失效，重定向拦截器会处理
+    if (!userStore.userInfo) {
+      try {
+        await userStore.fetchUserInfo()
+      } catch (e) {
+        // token 失效，重定向拦截器会处理
+      }
     }
     if (to.meta.requiresAdmin && !userStore.isAdmin) {
       ElMessage.warning('需要管理员权限')
@@ -169,6 +172,11 @@ router.beforeEach(async (to, from, next) => {
     if (to.meta.requiresMerchant && !userStore.isMerchant) {
       ElMessage.warning('需要商户权限')
       return next('/')
+    }
+    // 商户账号不提供学生向操作页面（发布探店笔记 / 提交商户菜单），直达链接同样拦截
+    if (to.meta.requiresConsumer && userStore.isMerchant) {
+      ElMessage.warning('商户账号仅可发布与管理自己的店铺与菜单')
+      return next('/merchant')
     }
   }
   return next()

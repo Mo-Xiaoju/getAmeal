@@ -20,7 +20,13 @@
       </div>
 
       <div class="hero-actions">
-        <template v-if="userStore.isLoggedIn">
+        <template v-if="userStore.isMerchant">
+          <el-button type="primary" size="large" :icon="Plus" @click="router.push('/merchant')">
+            发布店铺 / 管理菜单
+          </el-button>
+          <el-button size="large" @click="router.push('/shops')">逛一逛店铺</el-button>
+        </template>
+        <template v-else-if="userStore.isLoggedIn">
           <el-button type="primary" size="large" @click="router.push('/shops')">逛一逛店铺</el-button>
           <el-button size="large" @click="router.push('/profile')">进入个人中心</el-button>
         </template>
@@ -29,6 +35,22 @@
           <el-button size="large" @click="router.push('/login')">登录</el-button>
         </template>
       </div>
+    </section>
+
+    <!-- 商户发布引导：选择学校后常驻，让"发布店铺/菜单"在最直观的位置可见 -->
+    <section v-if="userStore.isMerchant && schoolStore.hasSchool" class="merchant-cta">
+      <div class="cta-text">
+        <el-icon class="cta-icon"><Shop /></el-icon>
+        <div>
+          <h3 class="cta-title">在「{{ schoolStore.currentSchool.name }}」发布你的店铺与菜单</h3>
+          <p class="cta-desc">
+            提交店铺与菜品后，经管理员审核即可被本校学生浏览、评分与收藏。
+          </p>
+        </div>
+      </div>
+      <el-button type="primary" size="large" :icon="Plus" @click="router.push('/merchant')">
+        进入商户中心
+      </el-button>
     </section>
 
     <!-- 推荐店铺 -->
@@ -98,7 +120,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, EditPen, School, Shop } from '@element-plus/icons-vue'
+import { ChatDotRound, EditPen, Plus, School, Shop } from '@element-plus/icons-vue'
 
 import DishCard from '@/components/DishCard.vue'
 import PostCard from '@/components/PostCard.vue'
@@ -175,6 +197,40 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   gap: 12px;
+}
+/* 商户发布引导横幅 */
+.merchant-cta {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, var(--el-color-success-light-9), #fff);
+  border: 1px solid var(--el-color-success-light-7);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.cta-text {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.cta-icon {
+  font-size: 34px;
+  color: var(--el-color-success);
+  flex-shrink: 0;
+}
+.cta-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: #303133;
+}
+.cta-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #909399;
 }
 .recommend {
   margin-top: 36px;

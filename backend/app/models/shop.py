@@ -26,12 +26,17 @@ class Shop(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     # 审核状态：approved 已通过 | pending 待审核（学生提交）| rejected 已驳回
     status = db.Column(db.String(20), nullable=False, default='approved', server_default='approved')
+    # 审核记录：审核人 / 时间 / 驳回原因（approved 时常为 NULL）
+    reviewed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reject_reason = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # 关系：N:1 学校/归属用户；1:N 菜品、评价与收藏
     school = db.relationship('School', back_populates='shops')
-    owner = db.relationship('User', backref='owned_shops')
+    owner = db.relationship('User', backref='owned_shops', foreign_keys=[owner_id])
+    reviewer = db.relationship('User', foreign_keys=[reviewed_by])
     dishes = db.relationship('Dish', back_populates='shop', lazy='dynamic')
     reviews = db.relationship('Review', back_populates='shop', lazy='dynamic')
 

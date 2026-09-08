@@ -24,8 +24,13 @@ const chatStore = useChatStore()
 watch(
   () => userStore.token,
   (token) => {
-    if (token) chatStore.connect()
-    else chatStore.disconnect()
+    if (token) {
+      chatStore.connect()
+      // 刷新后 userInfo 为空，用 token 拉回账号资料（登录流程已赋值则自动跳过）
+      userStore.restoreSession()
+    } else {
+      chatStore.disconnect()
+    }
   },
   { immediate: true },
 )

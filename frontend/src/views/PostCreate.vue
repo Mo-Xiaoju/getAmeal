@@ -38,10 +38,10 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="图片 URL（可选）">
+        <el-form-item label="图片（本地上传优先，URL 备择；支持多张）">
           <div class="image-inputs">
             <div v-for="(img, i) in form.images" :key="i" class="image-input-row">
-              <el-input v-model="form.images[i]" placeholder="https://图片地址" />
+              <ImageField v-model="form.images[i]" :size="76" />
               <el-button :icon="Delete" circle type="danger" plain @click="removeImage(i)" />
             </div>
             <el-button :icon="Plus" plain @click="addImage">添加图片</el-button>
@@ -63,6 +63,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete, Plus } from '@element-plus/icons-vue'
 
+import ImageField from '@/components/ImageField.vue'
 import { usePostStore } from '@/store/post'
 import { useSchoolStore } from '@/store/school'
 import { useShopStore } from '@/store/shop'

@@ -19,6 +19,7 @@ class ShopSchema(Schema):
     address = fields.Str()
     image_url = fields.Str()
     status = fields.Str()  # approved / pending / rejected
+    reject_reason = fields.Str()  # 驳回原因（仅供提交者/审核端回显）
 
     def _school_name(self, obj) -> str:
         return getattr(obj, 'school_name', None) or (obj.school.name if obj.school else None)
@@ -64,7 +65,16 @@ class ShopDetailSchema(ShopSchema):
     longitude = fields.Float()
     latitude = fields.Float()
     created_at = fields.DateTime()
+    owner_id = fields.Int()  # 店铺归属（前端据此判定是否展示管理按钮）
+    community_maintained = fields.Method('_community_maintained')  # 是否未被商户认领（学生可补充菜单）
     favorited = fields.Method('_favorited')
+
+    def _community_maintained(self, obj) -> bool:
+        """未被商户认领（owner 为空或 owner 非商户角色）的店，学生可补充菜品。"""
+        if obj.owner_id is None:
+            return True
+        owner = getattr(obj, 'owner', None)
+        return owner is None or owner.role != 'merchant'
 
     def _favorited(self, obj) -> bool:
         """当前登录用户是否已收藏（未登录恒为 False）。"""

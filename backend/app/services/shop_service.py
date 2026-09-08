@@ -27,8 +27,9 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
 
 
 def _get_active_shop(shop_id: int) -> Shop:
+    """对外只放行 approved 且上架的店铺；pending/rejected 仅 owner 走商户中心可见。"""
     shop = Shop.query.get(shop_id)
-    if shop is None or not shop.is_active:
+    if shop is None or not shop.is_active or shop.status != 'approved':
         raise NotFoundError(message='店铺不存在', code=4040)
     return shop
 
@@ -40,7 +41,7 @@ class ShopService:
     @staticmethod
     def list_shops(params: dict) -> dict:
         """店铺列表：school_id / keyword / category 筛选 + 排序 + 分页。"""
-        query = Shop.query.filter_by(is_active=True)
+        query = Shop.query.filter_by(is_active=True, status='approved')
 
         school_id = params.get('school_id')
         if school_id:

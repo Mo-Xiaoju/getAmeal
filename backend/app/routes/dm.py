@@ -36,12 +36,15 @@ def get_peer_messages(peer_id):
 @require_consumer
 def send_dm():
     """发送私信（实时送达；离线时仍落库，可在历史中看到）。"""
-    data = DmSendSchema().load(request.get_json(silent=True) or {})
+    raw = request.get_json(silent=True) or {}
+    data = DmSendSchema().load(raw)
     content = (data.get('content') or '').strip()
     if not content:
         raise ValidationError(message='消息内容不能为空', code=4000)
     channel = {'type': 'dm', 'id': data['recipient_id']}
-    message = MessageService.send(g.current_user, channel, content)
+    # shop_id 透传给服务层：schema 会 EXCLUDE 掉未知字段，需从原始请求取，
+    # 由 MessageService 统一拦截「私信不支持关联店铺」（与 socket 路径一致）
+    message = MessageService.send(g.current_user, channel, content, None, raw.get('shop_id'))
     return ok(message, message='发送成功')
 
 

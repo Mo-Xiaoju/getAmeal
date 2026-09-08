@@ -16,19 +16,22 @@
           </div>
         </div>
         <div class="row-actions">
-          <el-button
-            v-if="mode === 'followers'"
-            size="small"
-            :type="u.is_following ? 'info' : 'primary'"
-            plain
-            @click="handleFollow(u)"
-          >
-            {{ u.is_following ? '已关注' : '关注' }}
-          </el-button>
-          <span v-else class="following-badge">已关注</span>
-          <el-button v-if="u.id !== myId" size="small" type="primary" plain @click="sendDm(u)">
-            发私信
-          </el-button>
+          <!-- 商户不可关注他人/发起私信（后端 require_consumer），仅保留关系展示 -->
+          <template v-if="!userStore.isMerchant">
+            <el-button
+              v-if="mode === 'followers'"
+              size="small"
+              :type="u.is_following ? 'info' : 'primary'"
+              plain
+              @click="handleFollow(u)"
+            >
+              {{ u.is_following ? '已关注' : '关注' }}
+            </el-button>
+            <span v-else class="following-badge">已关注</span>
+            <el-button v-if="u.id !== myId" size="small" type="primary" plain @click="sendDm(u)">
+              发私信
+            </el-button>
+          </template>
         </div>
       </div>
     </div>

@@ -59,6 +59,17 @@ export const useUserStore = defineStore('user', {
       useSchoolStore().applyAccountSchool(this.userInfo?.school)
       return this.userInfo
     },
+    // 刷新/重新进入页面时恢复会话：token 还在但内存里没有账号资料 → 拉一次。
+    // 登录/注册刚设置过 userInfo 的场景直接跳过，避免重复请求。
+    async restoreSession() {
+      if (this.token && !this.userInfo) {
+        try {
+          await this.fetchUserInfo()
+        } catch (e) {
+          // token 失效等错误已由 401 拦截器统一清理并跳登录页
+        }
+      }
+    },
     // 更新个人信息，payload: { nickname, avatar_url }
     async updateProfile(payload) {
       const res = await authApi.updateMe(payload)

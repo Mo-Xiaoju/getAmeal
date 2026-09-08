@@ -2,7 +2,7 @@
 from flask import Blueprint, g, request
 
 from app.services.message_service import MessageService
-from app.utils.decorators import require_consumer, require_login
+from app.utils.decorators import require_login
 from app.utils.exceptions import PermissionError, ValidationError
 from app.utils.responses import ok
 
@@ -31,13 +31,14 @@ def get_school_messages():
 
 
 @bp_chat.route('/messages', methods=['POST'])
-@require_consumer
+@require_login
 def send_school_message():
-    """发送全校群聊消息（学生/管理员，商户不可）。"""
+    """发送全校群聊消息（所有登录角色，含商户）；可附带店铺标注。"""
     data = request.get_json(silent=True) or {}
     content = (data.get('content') or '').strip()
-    if not content:
+    shop_id = data.get('shop_id')
+    if not content and not shop_id:
         raise ValidationError(message='消息内容不能为空', code=4000)
     channel = {'type': 'school', 'id': _school_id_of(g.current_user)}
-    message = MessageService.send(g.current_user, channel, content)
+    message = MessageService.send(g.current_user, channel, content, None, shop_id)
     return ok(message, message='发送成功')

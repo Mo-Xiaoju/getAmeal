@@ -23,6 +23,7 @@ class Message(db.Model):
     circle_id = db.Column(db.Integer, db.ForeignKey('circles.id'), nullable=True, index=True)     # 群聊目标群
     recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)    # 私信目标用户
     school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True, index=True)     # 全校群聊目标学校
+    shop_id = db.Column(db.Integer, db.ForeignKey('shops.id', ondelete='SET NULL'), nullable=True, index=True)  # 店铺关联标注
     read_at = db.Column(db.DateTime, nullable=True)                             # 私信已读时间
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -30,3 +31,5 @@ class Message(db.Model):
     user = db.relationship('User', foreign_keys=[user_id], backref='messages')
     circle = db.relationship('Circle')
     recipient = db.relationship('User', foreign_keys=[recipient_id])
+    # 店铺关联标注：joined 即时联查，避免历史/会话列表逐条 N+1
+    shop = db.relationship('Shop', foreign_keys=[shop_id], lazy='joined')

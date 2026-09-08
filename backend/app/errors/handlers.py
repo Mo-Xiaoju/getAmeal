@@ -88,6 +88,12 @@ def handle_404(e):
     return error(message='资源不存在', code=404, status_code=404)
 
 
+@bp_errors.app_errorhandler(413)
+def handle_413(e):
+    """请求体超限（图片 >16MB 等），返回 JSON 信封而非 Flask 默认 HTML。"""
+    return error(message='文件过大，最大支持 16MB', code=4000, status_code=413)
+
+
 @bp_errors.app_errorhandler(500)
 def handle_500(e):
     """兜底 500。"""
