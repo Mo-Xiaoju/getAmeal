@@ -9,27 +9,34 @@ bp_admin = Blueprint('admin', __name__)
 
 
 @bp_admin.route('/shops', methods=['GET'])
+@require_admin
 def admin_get_shops():
     """店铺管理列表。"""
-    return ok()  # TODO: AdminService.list_shops()
+    params = request.args.to_dict()
+    return ok(AdminService.list_shops(params))
 
 
 @bp_admin.route('/shops', methods=['POST'])
+@require_admin
 def admin_add_shop():
     """新增店铺。"""
-    return ok()  # TODO: AdminService.add_shop()
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.add_shop(data), message='店铺已创建')
 
 
 @bp_admin.route('/shops/<int:shop_id>', methods=['PUT'])
+@require_admin
 def admin_update_shop(shop_id):
     """修改店铺信息。"""
-    return ok()  # TODO: AdminService.update_shop(shop_id)
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.update_shop(shop_id, data), message='已更新')
 
 
 @bp_admin.route('/shops/<int:shop_id>', methods=['DELETE'])
+@require_admin
 def admin_delete_shop(shop_id):
     """删除/下架店铺（软删除）。"""
-    return ok()  # TODO: AdminService.delete_shop(shop_id)
+    return ok(AdminService.delete_shop(shop_id), message='店铺已下架')
 
 
 @bp_admin.route('/users', methods=['GET'])
