@@ -16,6 +16,8 @@ class MessageSchema(Schema):
     images = fields.Method('_images')
     channel = fields.Method('_channel')
     author = fields.Method('_author')
+    shop_id = fields.Int()
+    shop = fields.Method('_shop')
     created_at = fields.DateTime()
 
     def _images(self, obj) -> list:
@@ -23,6 +25,18 @@ class MessageSchema(Schema):
             return json.loads(obj.images or '[]')
         except (TypeError, ValueError):
             return []
+
+    def _shop(self, obj):
+        """店铺关联标注（无则 None）。"""
+        shop = getattr(obj, 'shop', None)
+        if shop is None:
+            return None
+        return {
+            'id': shop.id,
+            'name': shop.name,
+            'image_url': shop.image_url,
+            'category': shop.category,
+        }
 
     def _channel(self, obj) -> dict:
         if obj.recipient_id is not None:

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 import * as schoolApi from '@/api/school'
+import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'
 import { getSchool, setSchool } from '@/utils/auth'
 
@@ -32,14 +33,17 @@ export const useSchoolStore = defineStore('school', {
         this.loading = false
       }
     },
-    // 选择学校：写入本地；若已登录则同步绑定到账号
+    // 选择学校：写入本地；若已登录则同步绑定到账号，并把 socket 切到该校群聊房间
     async selectSchool(school) {
+      const oldId = this.currentSchool?.id
       this.currentSchool = school
       this._persist()
       const userStore = useUserStore()
       if (userStore.isLoggedIn) {
         try {
           await userStore.updateProfile({ school_id: school.id })
+          // 绑定成功后让实时连接加入新学校房间（并离开旧学校房间）
+          useChatStore().emitSchoolChange(school.id, oldId)
         } catch (e) {
           // 绑定失败不阻断浏览，个人中心可再改
         }

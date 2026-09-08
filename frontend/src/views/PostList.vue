@@ -5,7 +5,11 @@
         <h1 class="page-title">{{ isMine ? '我的笔记' : '探店笔记' }}</h1>
         <p class="page-desc">{{ isMine ? '你发布的探店内容' : '分享你发现的校园好味道' }}</p>
       </div>
-      <el-button type="primary" :icon="EditPen" @click="handleCreate">发布笔记</el-button>
+      <!-- 商户不开放发布探店笔记（后端 4031），页内给出商户中心入口 -->
+      <el-button v-if="userStore.isMerchant" type="success" :icon="Shop" @click="router.push('/merchant')">
+        商户中心
+      </el-button>
+      <el-button v-else type="primary" :icon="EditPen" @click="handleCreate">发布笔记</el-button>
     </div>
 
     <!-- 筛选栏（我的笔记页隐藏） -->
@@ -47,7 +51,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { EditPen, Search } from '@element-plus/icons-vue'
+import { EditPen, Search, Shop } from '@element-plus/icons-vue'
 
 import Pagination from '@/components/Pagination.vue'
 import PostCard from '@/components/PostCard.vue'

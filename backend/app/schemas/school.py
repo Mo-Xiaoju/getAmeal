@@ -21,4 +21,4 @@ class SchoolSchema(Schema):
         counts = getattr(self, 'context', None) or {}
         if counts:
             return counts.get(obj.id, 0)
-        return obj.shops.filter_by(is_active=True).count()
+        return obj.shops.filter_by(is_active=True, status='approved').count()

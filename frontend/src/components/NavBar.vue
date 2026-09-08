@@ -12,6 +12,15 @@
         <router-link to="/posts" class="nav-link" :class="{ active: isActive('/posts') }">笔记</router-link>
         <router-link to="/circles" class="nav-link" :class="{ active: isActive('/circles') }">圈子</router-link>
         <router-link to="/chat" class="nav-link" :class="{ active: isActive('/chat') }">校园群聊</router-link>
+        <!-- 商户常驻入口：让"发布/管理店铺"始终可见，不依赖头像下拉 -->
+        <router-link
+          v-if="userStore.isMerchant"
+          to="/merchant"
+          class="nav-link nav-link-merchant"
+          :class="{ active: isActive('/merchant') }"
+        >
+          <el-icon><Shop /></el-icon><span>商户中心</span>
+        </router-link>
       </nav>
 
       <div class="navbar-right">
@@ -209,6 +218,24 @@ const handleCommand = async (command) => {
 .nav-link.active {
   color: var(--el-color-primary);
   font-weight: 600;
+}
+.nav-link-merchant {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--el-color-primary);
+  color: #fff;
+  border-radius: 16px;
+  padding: 5px 14px;
+  font-weight: 600;
+}
+.nav-link-merchant:hover {
+  background: var(--el-color-primary-light-3);
+  color: #fff;
+}
+.nav-link-merchant.active {
+  background: var(--el-color-primary-dark-2);
+  color: #fff;
 }
 .navbar-right {
   display: flex;

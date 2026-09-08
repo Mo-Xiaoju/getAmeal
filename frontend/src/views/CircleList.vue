@@ -23,40 +23,50 @@
           >
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-          <el-button type="primary" :icon="Plus" @click="openCreate">创建圈子</el-button>
+          <!-- 商户不开放创建圈子（后端 4031） -->
+          <el-button v-if="!userStore.isMerchant" type="primary" :icon="Plus" @click="openCreate">
+            创建圈子
+          </el-button>
         </div>
       </div>
 
-      <div v-loading="circleStore.loading" class="circle-grid">
-        <div
-          v-for="c in circleStore.list"
-          :key="c.id"
-          class="circle-card"
-          @click="router.push(`/circles/${c.id}`)"
-        >
-          <div class="cover" :style="coverStyle(c)">
-            <div class="cover-joined" v-if="c.joined">已加入</div>
-            <div class="cover-name">{{ c.name }}</div>
-          </div>
-          <div class="card-body">
-            <div class="desc">{{ c.description || '这个圈子还没有简介' }}</div>
-            <div class="card-foot">
-              <span class="member">
-                <el-icon><UserFilled /></el-icon>{{ c.member_count }} 人
-              </span>
-              <el-button
-                v-if="!c.joined"
-                size="small"
-                type="primary"
-                @click.stop="handleJoin(c)"
-              >加入</el-button>
-              <el-button v-else size="small" type="info" plain @click.stop="handleJoin(c)">
-                退出
-              </el-button>
+      <div v-loading="circleStore.loading" class="circle-area">
+        <div v-if="!circleStore.loading && !circleStore.list.length" class="circle-empty">
+          <el-empty description="还没有圈子，快来创建一个吧～" />
+        </div>
+        <div v-else class="circle-grid">
+          <div
+            v-for="c in circleStore.list"
+            :key="c.id"
+            class="circle-card"
+            @click="router.push(`/circles/${c.id}`)"
+          >
+            <div class="cover" :style="coverStyle(c)">
+              <div class="cover-joined" v-if="c.joined">已加入</div>
+              <div class="cover-name">{{ c.name }}</div>
+            </div>
+            <div class="card-body">
+              <div class="desc">{{ c.description || '这个圈子还没有简介' }}</div>
+              <div class="card-foot">
+                <span class="member">
+                  <el-icon><UserFilled /></el-icon>{{ c.member_count }} 人
+                </span>
+                <!-- 商户不可加入/退出圈子（后端 4031），仅展示成员数 -->
+                <template v-if="!userStore.isMerchant">
+                  <el-button
+                    v-if="!c.joined"
+                    size="small"
+                    type="primary"
+                    @click.stop="handleJoin(c)"
+                  >加入</el-button>
+                  <el-button v-else size="small" type="info" plain @click.stop="handleJoin(c)">
+                    退出
+                  </el-button>
+                </template>
+              </div>
             </div>
           </div>
         </div>
-        <el-empty v-if="!circleStore.loading && !circleStore.list.length" description="还没有圈子，快来创建一个吧～" />
       </div>
 
       <Pagination
@@ -69,8 +79,8 @@
       />
 
       <!-- 创建圈子 -->
-      <el-dialog v-model="createVisible" title="创建圈子" width="440px">
-        <el-form label-width="72px" @submit.prevent>
+      <el-dialog v-model="createVisible" title="创建圈子" width="480px">
+        <el-form label-width="100px" class="create-form" @submit.prevent>
           <el-form-item label="所在学校">
             <el-input :model-value="schoolStore.currentSchool.name" disabled />
           </el-form-item>
@@ -82,7 +92,7 @@
                       placeholder="介绍下这个圈子是干嘛的" />
           </el-form-item>
           <el-form-item label="封面图">
-            <el-input v-model="form.cover_url" placeholder="图片 URL（可选，留空用默认封面）" />
+            <ImageField v-model="form.cover_url" :size="120" />
           </el-form-item>
         </el-form>
         <template #footer>
@@ -101,6 +111,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ChatRound, Plus, Search, UserFilled } from '@element-plus/icons-vue'
 
+import ImageField from '@/components/ImageField.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useCircleStore } from '@/store/circle'
 import { useSchoolStore } from '@/store/school'
@@ -166,7 +177,8 @@ async function handleCreate() {
       school_id: schoolId(),
       name: form.name.trim(),
       description: form.description.trim(),
-      cover_url: form.cover_url.trim() || undefined,
+      // '' → 后端转 None（使用默认封面）；上传返回的 /api/uploads 路径原样保留
+      cover_url: form.cover_url.trim(),
     })
     createVisible.value = false
     ElMessage.success('创建成功，已自动加入')
@@ -220,11 +232,20 @@ onMounted(() => loadList(1))
 .search-input {
   width: 220px;
 }
+.circle-area {
+  min-height: 140px;
+}
+/* 空列表：占满整行并在页面中间居中展示默认空状态 */
+.circle-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46vh;
+}
 .circle-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
-  min-height: 120px;
 }
 .circle-card {
   background: #fff;
@@ -291,5 +312,9 @@ onMounted(() => loadList(1))
 }
 .list-pagination {
   margin-top: 24px;
+}
+/* 创建圈子弹窗：标题栏各 label 固定不换行，避免“圈子名称”因必填星号挤成两行 */
+.create-form :deep(.el-form-item__label) {
+  white-space: nowrap;
 }
 </style>

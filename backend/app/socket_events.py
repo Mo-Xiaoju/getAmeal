@@ -18,7 +18,7 @@ from flask_jwt_extended import decode_token
 from flask_socketio import join_room, leave_room
 
 from app.extensions import db, sio
-from app.models import CircleMembership, User
+from app.models import CircleMembership, School, User
 
 _lock = threading.Lock()
 _conn_user = {}  # sid -> user_id
@@ -65,8 +65,9 @@ def on_connect(auth=None):
 def on_send(data):
     """实时发送消息（主发送路径）。
 
-    data = { channel: {type, id}, content }。以回调返回发送结果：
+    data = { channel: {type, id}, content, shop_id? }。以回调返回发送结果：
     {ok: True, message} 成功；{ok: False, message} 失败（前端据此走 REST 兜底）。
+    商户只能发校园群聊，其余由 MessageService.send 内统一约束。
     """
     sid = request.sid
     with _lock:
@@ -79,9 +80,10 @@ def on_send(data):
 
     channel = (data or {}).get('channel')
     content = (data or {}).get('content')
+    shop_id = (data or {}).get('shop_id')
     try:
         from app.services.message_service import MessageService
-        message = MessageService.send(user, channel, content)
+        message = MessageService.send(user, channel, content, None, shop_id)
         return {'ok': True, 'message': message}
     except Exception as exc:
         return {'ok': False, 'message': getattr(exc, 'message', str(exc) or '发送失败')}
@@ -113,6 +115,40 @@ def on_circle_leave(data):
     if not circle_id:
         return {'ok': False, 'message': '参数缺失'}
     leave_room(f'circle_{int(circle_id)}')
+    return {'ok': True}
+
+
+@sio.on('school:join')
+def on_school_join(data):
+    """选择/切换学校后订阅该校群聊房间。
+
+    connect 时只会按账号当时绑定的 school_id 加入全校群房间；
+    若用户是登录后才选校/换校（新注册账号无学校），必须在此补订阅，
+    否则收不到别人发的全校群聊，自己发的也无回显。
+    """
+    sid = request.sid
+    with _lock:
+        user_id = _conn_user.get(sid)
+    school_id = (data or {}).get('school_id')
+    if not user_id or not school_id:
+        return {'ok': False, 'message': '参数缺失'}
+    school = db.session.get(School, int(school_id))
+    if school is None or not school.is_active:
+        return {'ok': False, 'message': '学校不存在或已停用'}
+    user = db.session.get(User, user_id)
+    if user is None or user.school_id != school.id:
+        return {'ok': False, 'message': '请先绑定到该校'}
+    join_room(f'chat_school_{school.id}')
+    return {'ok': True}
+
+
+@sio.on('school:leave')
+def on_school_leave(data):
+    """离开旧学校群聊房间（仅在会话中把学校从 A 换成 B 时调用）。"""
+    school_id = (data or {}).get('school_id')
+    if not school_id:
+        return {'ok': False, 'message': '参数缺失'}
+    leave_room(f'chat_school_{int(school_id)}')
     return {'ok': True}
 
 

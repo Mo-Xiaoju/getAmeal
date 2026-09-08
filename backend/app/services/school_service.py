@@ -17,7 +17,7 @@ class SchoolService:
         schools = School.query.filter_by(is_active=True).order_by(School.id).all()
         shop_counts = dict(
             db.session.query(Shop.school_id, func.count(Shop.id))
-            .filter(Shop.is_active.is_(True))
+            .filter(Shop.is_active.is_(True), Shop.status == 'approved')
             .group_by(Shop.school_id)
             .all()
         )

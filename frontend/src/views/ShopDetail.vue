@@ -25,15 +25,24 @@
           </p>
           <p v-if="shop.description" class="shop-desc">{{ shop.description }}</p>
           <div class="shop-actions">
-            <el-button
-              :type="shopStore.isFavorited ? 'warning' : 'primary'"
-              :plain="!shopStore.isFavorited"
-              :icon="shopStore.isFavorited ? StarFilled : Star"
-              @click="handleFavorite"
-            >
-              {{ shopStore.isFavorited ? '已收藏' : '收藏店铺' }}
+            <!-- 学生/游客/管理员：收藏 + 写评价（商户不开放，后端 4031） -->
+            <template v-if="!userStore.isMerchant">
+              <el-button
+                :type="shopStore.isFavorited ? 'warning' : 'primary'"
+                :plain="!shopStore.isFavorited"
+                :icon="shopStore.isFavorited ? StarFilled : Star"
+                @click="handleFavorite"
+              >
+                {{ shopStore.isFavorited ? '已收藏' : '收藏店铺' }}
+              </el-button>
+              <el-button type="success" plain :icon="EditPen" @click="scrollToReview">写评价</el-button>
+              <!-- 未入驻/社区店：同学可补充菜品（走审核） -->
+              <el-button v-if="canContribute" plain :icon="Plus" @click="openDishDialog">补充菜品</el-button>
+            </template>
+            <!-- 仅本商户的店铺出现管理入口；非本商户的店铺不渲染任何管理按钮 -->
+            <el-button v-else-if="isMyShop" type="primary" :icon="Shop" @click="router.push('/merchant')">
+              管理本店 · 菜单
             </el-button>
-            <el-button type="success" plain :icon="EditPen" @click="scrollToReview">写评价</el-button>
           </div>
         </div>
       </div>
@@ -53,24 +62,27 @@
 
     <!-- 评价区 -->
     <div class="review-section" ref="reviewSection">
-      <h2 class="section-title">发表评价</h2>
-      <div class="review-form">
-        <div class="form-rate">
-          <span class="form-label">评分：</span>
-          <el-rate v-model="form.rating" :texts="rateTexts" show-text />
+      <!-- 商户不开放写评价（后端 4031），仅保留评价浏览 -->
+      <template v-if="!userStore.isMerchant">
+        <h2 class="section-title">发表评价</h2>
+        <div class="review-form">
+          <div class="form-rate">
+            <span class="form-label">评分：</span>
+            <el-rate v-model="form.rating" :texts="rateTexts" show-text />
+          </div>
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="分享你的用餐体验（选填）"
+          />
+          <div class="form-actions">
+            <el-button type="primary" :loading="submitting" @click="handleSubmit">发布评价</el-button>
+          </div>
         </div>
-        <el-input
-          v-model="form.content"
-          type="textarea"
-          :rows="3"
-          maxlength="200"
-          show-word-limit
-          placeholder="分享你的用餐体验（选填）"
-        />
-        <div class="form-actions">
-          <el-button type="primary" :loading="submitting" @click="handleSubmit">发布评价</el-button>
-        </div>
-      </div>
+      </template>
 
       <h2 class="section-title">全部评价</h2>
       <div v-loading="reviewsLoading" class="review-list">
@@ -100,6 +112,34 @@
         @change="loadReviews"
       />
     </div>
+
+    <!-- 补充菜品（提交给未入驻/社区店，审核后展示） -->
+    <el-dialog v-model="dishDialog.show" title="补充菜品" width="480px">
+      <p class="dish-tip">该店尚未有商户入驻，你补充的菜品将进入审核，通过后对外展示。</p>
+      <el-form label-position="top">
+        <div class="dish-form-row">
+          <el-form-item label="菜品名" required>
+            <el-input v-model="dishDialog.form.name" maxlength="100" placeholder="例如：招牌盖饭" />
+          </el-form-item>
+          <el-form-item label="价格（元）" required>
+            <el-input-number v-model="dishDialog.form.price" :min="0" :precision="2" :step="1" style="width: 100%" />
+          </el-form-item>
+        </div>
+        <el-form-item label="描述">
+          <el-input v-model="dishDialog.form.description" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="菜品图">
+          <ImageField v-model="dishDialog.form.image_url" :size="72" />
+        </el-form-item>
+        <el-form-item label="标签（逗号分隔）">
+          <el-input v-model="dishDialog.form.tags" placeholder="例如：招牌,下饭" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dishDialog.show = false">取消</el-button>
+        <el-button type="primary" :loading="dishDialog.submitting" @click="handleSubmitDish">提交审核</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -107,9 +147,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { EditPen, Food, Location, Star, StarFilled } from '@element-plus/icons-vue'
+import { EditPen, Food, Location, Plus, Shop, Star, StarFilled } from '@element-plus/icons-vue'
 
+import { submitDish } from '@/api/contribute'
 import DishCard from '@/components/DishCard.vue'
+import ImageField from '@/components/ImageField.vue'
 import Pagination from '@/components/Pagination.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { useDishStore } from '@/store/dish'
@@ -133,6 +175,57 @@ const rateTexts = ['很差', '较差', '一般', '不错', '超赞']
 const form = reactive({ rating: 5, content: '' })
 
 const shop = computed(() => shopStore.shopDetail || {})
+// 当前登录商户是否为该店 owner（决定是否展示管理按钮）
+const isMyShop = computed(
+  () => userStore.isMerchant && shop.value.owner_id === userStore.userInfo?.id,
+)
+// 是否可向该店补充菜品：非商户 + 社区维护店（未被商户认领）+ 非自己提交的店
+const canContribute = computed(
+  () =>
+    !userStore.isMerchant &&
+    shop.value.community_maintained === true &&
+    shop.value.owner_id !== userStore.userInfo?.id,
+)
+
+// ---- 补充菜品 ----
+const dishDialog = reactive({
+  show: false,
+  submitting: false,
+  form: { name: '', price: 0, description: '', tags: '', image_url: '' },
+})
+
+const resetDishForm = () => {
+  dishDialog.form = { name: '', price: 0, description: '', tags: '', image_url: '' }
+}
+
+const openDishDialog = () => {
+  if (!requireLogin()) return
+  resetDishForm()
+  dishDialog.show = true
+}
+
+const handleSubmitDish = async () => {
+  const form = dishDialog.form
+  if (!form.name.trim()) {
+    ElMessage.warning('请输入菜品名')
+    return
+  }
+  dishDialog.submitting = true
+  try {
+    await submitDish(shopId.value, {
+      name: form.name.trim(),
+      price: form.price,
+      description: form.description?.trim() || undefined,
+      image_url: form.image_url?.trim() || '',
+      tags: form.tags ? form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
+    })
+    ElMessage.success('菜品已提交，审核通过后展示')
+    dishDialog.show = false
+    dishStore.fetchShopDishes(shopId.value)
+  } finally {
+    dishDialog.submitting = false
+  }
+}
 
 const formatDate = (iso) => {
   if (!iso) return ''
@@ -358,5 +451,16 @@ onMounted(() => {
   font-size: 14px;
   color: #606266;
   line-height: 1.7;
+}
+.dish-tip {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.6;
+}
+.dish-form-row {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 12px;
 }
 </style>

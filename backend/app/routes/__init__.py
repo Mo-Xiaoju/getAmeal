@@ -3,12 +3,14 @@ from flask import Flask
 
 from app.routes import (
     admin,
+    audit,
     auth,
     chat,
     circle,
     contribute,
     dish,
     dm,
+    media,
     merchant,
     post,
     school,
@@ -29,5 +31,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(circle.bp_circle, url_prefix='/api/circles')
     app.register_blueprint(dm.bp_dm, url_prefix='/api/dm')
     app.register_blueprint(admin.bp_admin, url_prefix='/api/admin')
+    app.register_blueprint(audit.bp_audit, url_prefix='/api/admin')
     app.register_blueprint(merchant.bp_merchant, url_prefix='/api/merchant')
     app.register_blueprint(contribute.bp_contribute, url_prefix='/api/contribute')
+    app.register_blueprint(media.bp_media, url_prefix='/api')

@@ -24,21 +24,24 @@
 
           <div class="head-actions">
             <el-button size="small" :icon="User" @click="openMembers">成员</el-button>
-            <template v-if="isOwner">
-              <el-button size="small" :icon="EditPen" @click="openEdit">编辑</el-button>
-              <el-button size="small" type="danger" plain :icon="Delete" @click="handleDissolve">
-                解散圈子
+            <!-- 圈子创建/编辑/加入均仅学生账号可用（后端 require_consumer），商户只读 -->
+            <template v-if="!userStore.isMerchant">
+              <template v-if="isOwner">
+                <el-button size="small" :icon="EditPen" @click="openEdit">编辑</el-button>
+                <el-button size="small" type="danger" plain :icon="Delete" @click="handleDissolve">
+                  解散圈子
+                </el-button>
+              </template>
+              <el-button
+                v-else-if="circleStore.detail.joined"
+                size="small"
+                type="info"
+                plain
+                @click="handleLeave"
+              >
+                退出圈子
               </el-button>
             </template>
-            <el-button
-              v-else-if="circleStore.detail.joined"
-              size="small"
-              type="info"
-              plain
-              @click="handleLeave"
-            >
-              退出圈子
-            </el-button>
           </div>
         </div>
 
@@ -46,6 +49,7 @@
         <ChatPanel
           v-if="circleStore.detail.joined"
           :channel="{ type: 'circle', id: circleStore.detail.id }"
+          :school-id="circleStore.detail.school_id"
           class="chat-body"
         />
 
@@ -55,9 +59,16 @@
             <div class="join-desc">
               {{ circleStore.detail.description || '这个圈子还没有简介，进圈聊聊就知道啦～' }}
             </div>
-            <el-button type="primary" size="large" :loading="joining" @click="handleJoin">
+            <el-button
+              v-if="!userStore.isMerchant"
+              type="primary"
+              size="large"
+              :loading="joining"
+              @click="handleJoin"
+            >
               加入圈子
             </el-button>
+            <p v-else class="merchant-note">商户账号不参与圈子群聊，如需发布内容请前往「商户中心」管理店铺与菜单</p>
           </el-empty>
         </div>
       </template>
@@ -77,8 +88,8 @@
     </el-drawer>
 
     <!-- 编辑圈子（仅创建者） -->
-    <el-dialog v-model="editVisible" title="编辑圈子" width="440px">
-      <el-form label-width="72px" @submit.prevent>
+    <el-dialog v-model="editVisible" title="编辑圈子" width="480px">
+      <el-form label-width="100px" class="edit-form" @submit.prevent>
         <el-form-item label="圈子名称" required>
           <el-input v-model="editForm.name" maxlength="60" show-word-limit />
         </el-form-item>
@@ -86,7 +97,7 @@
           <el-input v-model="editForm.description" type="textarea" :rows="3" maxlength="500" show-word-limit />
         </el-form-item>
         <el-form-item label="封面图">
-          <el-input v-model="editForm.cover_url" placeholder="图片 URL（可选）" />
+          <ImageField v-model="editForm.cover_url" :size="120" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -107,6 +118,7 @@ import {
 } from '@element-plus/icons-vue'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import ImageField from '@/components/ImageField.vue'
 import { useChatStore } from '@/store/chat'
 import { useCircleStore } from '@/store/circle'
 import { useUserStore } from '@/store/user'
@@ -221,7 +233,8 @@ async function handleEdit() {
     await circleStore.update(detailId.value, {
       name: editForm.name.trim(),
       description: editForm.description.trim(),
-      cover_url: editForm.cover_url.trim() || undefined,
+      // '' → 后端转 None 清除封面（更新仅当该键存在时生效，故不能发 undefined）
+      cover_url: editForm.cover_url.trim(),
     })
     editVisible.value = false
     ElMessage.success('已保存')
@@ -312,6 +325,11 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.merchant-note {
+  margin: 0;
+  font-size: 13px;
+  color: #a0a4ab;
+}
 .member-list {
   display: flex;
   flex-direction: column;
@@ -331,5 +349,9 @@ onBeforeUnmount(() => {
   flex: 1;
   font-size: 14px;
   color: #303133;
+}
+/* 编辑圈子弹窗：label 固定不换行，避免“圈子名称”因必填星号挤成两行 */
+.edit-form :deep(.el-form-item__label) {
+  white-space: nowrap;
 }
 </style>

@@ -32,6 +32,11 @@ class Config:
     PAGE_SIZE_DEFAULT = int(os.environ.get('PAGE_SIZE_DEFAULT', '10'))
     PAGE_SIZE_MAX = int(os.environ.get('PAGE_SIZE_MAX', '50'))
 
+    # ---- 图片上传（backend/uploads，gitignore 已放行）----
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))   # backend/
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+    MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB
+
 
 class DevelopmentConfig(Config):
     """开发环境。"""

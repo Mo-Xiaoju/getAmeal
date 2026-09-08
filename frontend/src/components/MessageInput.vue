@@ -20,12 +20,14 @@ import { computed, nextTick, ref } from 'vue'
 const props = defineProps({
   disabled: { type: Boolean, default: false },
   placeholder: { type: String, default: '输入消息，Enter 发送，Shift+Enter 换行…' },
+  // 允许发送纯店卡消息（无文字，由 ChatPanel 校验「有选中店铺」）
+  allowEmpty: { type: Boolean, default: false },
 })
 const emit = defineEmits(['send'])
 
 const draft = ref('')
 const textareaRef = ref(null)
-const canSend = computed(() => draft.value.trim().length > 0 && !props.disabled)
+const canSend = computed(() => (draft.value.trim().length > 0 || props.allowEmpty) && !props.disabled)
 
 const onKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -35,8 +37,9 @@ const onKeydown = (e) => {
 }
 
 const handleSend = () => {
+  if (props.disabled) return
   const text = draft.value.trim()
-  if (!text || props.disabled) return
+  if (!text && !props.allowEmpty) return
   emit('send', text)
   draft.value = ''
   nextTick(() => textareaRef.value?.focus())

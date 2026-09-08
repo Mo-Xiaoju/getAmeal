@@ -3,11 +3,13 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">管理后台</h1>
-        <p class="page-desc">用户角色 / 状态管理</p>
+        <p class="page-desc">用户管理 · 内容审核</p>
       </div>
       <el-button :icon="Refresh" plain @click="loadUsers(1)">刷新</el-button>
     </div>
 
+    <el-tabs v-model="adminTab" class="admin-tabs">
+    <el-tab-pane label="用户管理" name="users">
     <el-card shadow="never" class="panel">
       <template #header>
         <div class="panel-head">
@@ -63,6 +65,14 @@
         />
       </div>
     </el-card>
+    </el-tab-pane>
+
+    <el-tab-pane label="内容审核" name="audit">
+      <el-card shadow="never" class="panel">
+        <AuditQueue />
+      </el-card>
+    </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -74,7 +84,10 @@ import { Refresh } from '@element-plus/icons-vue'
 import { getAdminUsers, updateUser } from '@/api/admin'
 import { useUserStore } from '@/store/user'
 
+import AuditQueue from './AuditQueue.vue'
+
 const userStore = useUserStore()
+const adminTab = ref('users')
 
 const loading = ref(false)
 const users = ref([])
@@ -159,5 +172,8 @@ onMounted(() => loadUsers(1))
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+.admin-tabs {
+  margin-top: 4px;
 }
 </style>

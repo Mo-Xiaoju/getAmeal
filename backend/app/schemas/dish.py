@@ -16,6 +16,7 @@ class DishSchema(Schema):
     avg_rating = fields.Function(lambda obj: round(obj.avg_rating or 0.0, 2))
     rating_count = fields.Int()
     status = fields.Str()  # approved / pending / rejected
+    reject_reason = fields.Str()  # 驳回原因（仅供提交者/审核端回显）
 
     def _shop_name(self, obj) -> str:
         return obj.shop.name if obj.shop else None
