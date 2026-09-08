@@ -1,10 +1,15 @@
 import request from './request'
 
-// 用户列表，params: { page, page_size }
+// ========== 用户管理 ==========
 export const getAdminUsers = (params) => request.get('/admin/users', { params })
-
-// 变更用户角色/停用，data: { role?, is_active? }
 export const updateUser = (userId, data) => request.put(`/admin/users/${userId}`, data)
+
+
+// ========== 店铺管理 ==========
+export const getAdminShops = (params) => request.get('/admin/shops', { params })
+export const addShop = (data) => request.post('/admin/shops', data)
+export const updateShop = (shopId, data) => request.put(`/admin/shops/${shopId}`, data)
+export const deleteShop = (shopId) => request.delete(`/admin/shops/${shopId}`)
 
 // ---- 内容审核（学生提交的店铺 / 菜品）----
 // 店铺审核队列，params: { status, page, page_size }，status 默认 pending
@@ -17,3 +22,4 @@ export const reviewShop = (shopId, data) => request.post(`/admin/audits/shops/${
 export const bulkReviewShop = (shopId, data) => request.post(`/admin/audits/shops/${shopId}/bulk`, data)
 // 审核单道菜品，data: { action, reason? }
 export const reviewDish = (dishId, data) => request.post(`/admin/audits/dishes/${dishId}/review`, data)
+
