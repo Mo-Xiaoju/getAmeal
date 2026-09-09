@@ -1,6 +1,7 @@
 """店铺与评价相关路由。"""
 from flask import Blueprint, g, request
 
+from app.categories import CATEGORIES
 from app.services.dish_service import DishService
 from app.services.recommend_service import RecommendService
 from app.services.shop_service import ShopService
@@ -15,6 +16,12 @@ def get_shop_list():
     """店铺列表：支持学校/关键词/分类筛选、排序、分页。"""
     params = request.args.to_dict()
     return ok(ShopService.list_shops(params))
+
+
+@bp_shop.route('/categories', methods=['GET'])
+def get_shop_categories():
+    """店铺规范分类列表（受控词表唯一来源，供前端表单下拉 / 筛选取值）。"""
+    return ok({'categories': CATEGORIES})
 
 
 @bp_shop.route('/recommend', methods=['GET'])

@@ -1,4 +1,5 @@
 """管理后台业务逻辑。"""
+from app.categories import coerce_category
 from app.extensions import db
 from app.models import School, Shop, User
 from app.utils.exceptions import NotFoundError, ValidationError
@@ -169,3 +170,16 @@ class AdminService:
         shop.is_active = False
         db.session.commit()
         return _shop_admin_view(shop)
+
+    @staticmethod
+    def reclassify_shop_category(shop_id: int, category) -> dict:
+        """管理员归类店铺分类（任意状态均可，含已过审的历史脏值）。
+
+        category 经 coerce_category 强制落规范分类；传空则清空分类。
+        """
+        shop = db.session.get(Shop, shop_id)
+        if shop is None or not shop.is_active:
+            raise NotFoundError(message='店铺不存在', code=4040)
+        shop.category = coerce_category(category)
+        db.session.commit()
+        return {'id': shop.id, 'name': shop.name, 'category': shop.category}

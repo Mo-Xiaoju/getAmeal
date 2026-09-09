@@ -3,6 +3,7 @@ from flask import Blueprint, g, request
 
 from app.services.admin_service import AdminService
 from app.utils.decorators import require_admin
+from app.utils.exceptions import ValidationError
 from app.utils.responses import ok
 
 bp_admin = Blueprint('admin', __name__)
@@ -37,6 +38,16 @@ def admin_update_shop(shop_id):
 def admin_delete_shop(shop_id):
     """删除/下架店铺（软删除）。"""
     return ok(AdminService.delete_shop(shop_id), message='店铺已下架')
+
+
+@bp_admin.route('/shops/<int:shop_id>/category', methods=['PUT'])
+@require_admin
+def admin_reclassify_shop_category(shop_id):
+    """归类店铺分类（受控词表），body {category}，传 null 可清空。"""
+    data = request.get_json(silent=True) or {}
+    if 'category' not in data:
+        raise ValidationError(message='请提供 category 字段（可传 null 清空分类）', code=4000)
+    return ok(AdminService.reclassify_shop_category(shop_id, data.get('category')), message='已更新')
 
 
 @bp_admin.route('/users', methods=['GET'])

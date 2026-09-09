@@ -1,12 +1,14 @@
 """学生代维护商户/菜单业务逻辑。
 
-针对未入驻平台的商户，学生可提交店铺与菜品，内容标记 status=pending，经管理员
-审核后对外开放展示。审核通过的店/菜再次编辑会回到 pending 重新审核。
-社区共建：任何学生都能向「未被商户认领且已公开」的店铺补充菜品（仍待审），
-菜品归属提交者本人；店铺信息仅其提交者本人可维护。
+针对未入驻平台的商户，学生可提交店铺与菜品；商户入驻店铺的菜单若更新不及时，
+同学同样可代为补充菜品。提交内容标记 status=pending，经管理员审核后对外展示。
+审核通过的店/菜再次编辑会回到 pending 重新审核。
+社区共建：任何学生都能向「已审核公开」的店铺（含商户入驻店）补充菜品（仍待审、
+同店同名去重），菜品归属提交者本人；店铺信息仅其提交者本人可维护。
 """
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 
+from app.categories import normalize_category_payload
 from app.extensions import db
 from app.models import Dish, Shop
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
@@ -41,19 +43,20 @@ def _get_mutable_dish(user, dish_id: int) -> Dish:
 
 
 def _get_contribute_target_shop(user, shop_id: int) -> Shop:
-    """加菜的目标店铺：本人提交的店（任意状态），或已公开且未被商户认领的社区店。"""
+    """加菜的目标店铺：本人提交的店（任意状态），或已公开（approved）的在售店铺。
+
+    商户入驻店铺的菜单也可能更新不及时，故一并放开：同学补充的菜品走 pending 审核，
+    通过后才对外展示，不会改动商家正在维护的菜单。
+    """
     shop = db.session.get(Shop, shop_id)
     if shop is None or not shop.is_active:
         raise NotFoundError(message='店铺不存在', code=4040)
     if shop.owner_id == user.id:
         return shop
-    # 未被商户认领：owner 为空（管理员种子店）或 owner 非商户角色
-    owner = shop.owner
-    community = shop.owner_id is None or (owner is not None and owner.role != 'merchant')
-    if shop.status == 'approved' and community:
+    if shop.status == 'approved':
         return shop
     raise PermissionError(
-        message='仅可向自己提交的店铺，或已公开且未被商户认领的店铺补充菜品', code=4032
+        message='仅可向自己提交的店铺，或已审核公开的店铺补充菜品', code=4032
     )
 
 
@@ -75,6 +78,26 @@ def _validate_unique_shop_name(name: str, exclude_id: int = None) -> None:
         query = query.filter(Shop.id != exclude_id)
     if query.first() is not None:
         raise ValidationError(message=f'店铺「{name}」已存在，请直接选择关联该店铺', code=4006)
+
+
+def _ensure_unique_dish(shop_id: int, name: str, exclude_id: int = None) -> None:
+    """同店同名去重：该店已有在售/审核中的同名菜品时拒绝重复补充（改名时排除自身）。"""
+    name = (name or '').strip()
+    if not name:
+        return
+    query = Dish.query.filter(
+        Dish.shop_id == shop_id,
+        Dish.is_active.is_(True),
+        Dish.status.in_(['approved', 'pending']),
+        func.lower(Dish.name) == name.lower(),
+    )
+    if exclude_id is not None:
+        query = query.filter(Dish.id != exclude_id)
+    if query.first() is not None:
+        raise ValidationError(
+            message=f'该店已收录同名菜品「{name}」（在售或审核中），无需重复补充',
+            code=4007,
+        )
 
 
 class ContributeService:
@@ -134,6 +157,7 @@ class ContributeService:
     def create_shop(user, data: dict) -> dict:
         """提交新店铺（status=pending，待审核）。"""
         data = ShopCreateSchema().load(data)
+        data = normalize_category_payload(data)
         _validate_unique_shop_name(data['name'])
         shop = Shop(**data, owner_id=user.id, status='pending')
         db.session.add(shop)
@@ -149,6 +173,7 @@ class ContributeService:
         """修改本人提交的店铺：编辑后回到待审核（approved 亦重新审核）。"""
         shop = _get_owned_shop(user, shop_id)
         data = ShopUpdateSchema().load(data)
+        data = normalize_category_payload(data)
         name = data.get('name')
         if name is not None:
             name = name.strip()
@@ -181,10 +206,11 @@ class ContributeService:
     @staticmethod
     def add_dish(user, shop_id: int, data: dict) -> dict:
         """给店铺补充菜品（status=pending，待审核）。
-        放行范围：本人提交的店，或已公开且未被商户认领的社区店。
+        放行范围：本人提交的店，或已审核公开的在售店铺（含商户入驻店）。
         """
         shop = _get_contribute_target_shop(user, shop_id)
         data = DishCreateSchema().load(data)
+        _ensure_unique_dish(shop.id, data['name'])
         tags = ','.join(t.strip() for t in data.pop('tags') or [] if t and t.strip())
         dish = Dish(shop_id=shop.id, owner_id=user.id, status='pending', tags=tags or None, **data)
         db.session.add(dish)
@@ -196,6 +222,8 @@ class ContributeService:
         """修改本人可维护的菜品：编辑后回到待审核。"""
         dish = _get_mutable_dish(user, dish_id)
         data = DishUpdateSchema().load(data)
+        if data.get('name') is not None:
+            _ensure_unique_dish(dish.shop_id, data['name'], exclude_id=dish.id)
         changed = False
         for key, value in data.items():
             if value is None:

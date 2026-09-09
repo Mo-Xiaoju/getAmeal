@@ -18,6 +18,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
+from app.categories import canonicalize, family_of
 from app.extensions import db
 from app.models import Dish, Favorite, Like, Post, Review, Shop, UserFollow
 from app.schemas.dish import DishSchema
@@ -60,10 +61,24 @@ class RecProfile:
 
 # ---- 数值工具 ----
 def _norm_cat(raw) -> str:
-    """category 是自由文本：画像与候选匹配统一用 trim+lower 归一（无同义表，种子用规范 token）。"""
-    if not raw:
-        return ''
-    return str(raw).strip().lower()
+    """category 匹配口径：走规范词表（trim/lower + 别名归并，见 app.categories）。"""
+    return canonicalize(raw)
+
+
+def _cat_share(profile, canonical) -> float:
+    """候选店分类对画像的命中份额：精确命中优先；miss 时给粗粒度族弱兜底。
+
+    族兜底只发生在精确 0 分时，取同族其它成员的偏好和 ×0.5——不会反客为主，
+    避免"只爱奶茶却被大量咖啡店顶上来"；无族或画像不可用时恒为 0。
+    canonical 已由 _norm_cat 产出，画像键亦为规范值，两侧口径一致。
+    """
+    share = profile.cat_weights.get(canonical, 0.0)
+    if share:
+        return share
+    members = family_of(canonical)
+    if len(members) > 1:
+        return 0.5 * sum(profile.cat_weights.get(c, 0.0) for c in members if c != canonical)
+    return 0.0
 
 
 def _jaccard(a: set, b: set) -> float:
@@ -244,7 +259,7 @@ class RecommendService:
                 reason.append('新上架')
 
             if profile.available:
-                cat_share = profile.cat_weights.get(_norm_cat(shop.category), 0.0)
+                cat_share = _cat_share(profile, _norm_cat(shop.category))
                 is_followed_owner = bool(shop.owner_id and shop.owner_id in profile.followee_ids)
                 score += W_SHOP['cat'] * cat_share + W_SHOP['author'] * (1.0 if is_followed_owner else 0.0)
                 if cat_share > 0:
@@ -378,7 +393,7 @@ class RecommendService:
             if profile.available:
                 cat_share = 0.0
                 if post.shop is not None:
-                    cat_share = profile.cat_weights.get(_norm_cat(post.shop.category), 0.0)
+                    cat_share = _cat_share(profile, _norm_cat(post.shop.category))
                 is_followed_author = post.user_id in profile.followee_ids
                 tags = {t.strip().lower() for t in (post.tags or '').split(',') if t.strip()}
                 sim = 0.5 * cat_share + 0.5 * _jaccard(tags, profile.tags)

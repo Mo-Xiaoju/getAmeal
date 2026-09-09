@@ -1,6 +1,6 @@
 """学生提交商户/菜单路由（需学生/管理员登录，商户不可）。
 
-审查机制 TODO：pending 内容暂对 C 端可见，待审核队列落地后再放行/过滤。
+提交/补充的店铺与菜品均标记 status=pending，进管理端审核队列；审核通过后才对外展示。
 """
 from flask import Blueprint, g, request
 
@@ -45,7 +45,7 @@ def delete_shop(shop_id):
 @bp_contribute.route('/shops/<int:shop_id>/dishes', methods=['POST'])
 @require_consumer
 def add_dish(shop_id):
-    """给本人提交的店铺添加菜单（pending）。"""
+    """给店铺补充菜品（本人提交的店，或已审核公开的在售店；pending 待审，同店同名去重）。"""
     data = request.get_json(silent=True) or {}
     return ok(ContributeService.add_dish(g.current_user, shop_id, data), message='提交成功，待审核')
 
