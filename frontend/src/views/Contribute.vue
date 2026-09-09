@@ -263,10 +263,11 @@ const statusTagType = (s) => ({ approved: 'success', pending: 'warning', rejecte
 const loadMy = async () => {
   loading.value = true
   try {
-    const data = await getMyContributions({ page: 1, page_size: 50 })
-    shops.value = data.data.items || []
-    contributedDishes.value = data.data.contributed_dishes || []
-    dishTotal.value = data.data.dish_total || 0
+    const res = await getMyContributions({ page: 1, page_size: 50 })
+    const d = res.data?.data || {}
+    shops.value = d.items || []
+    contributedDishes.value = d.contributed_dishes || []
+    dishTotal.value = d.dish_total || 0
   } finally {
     loading.value = false
   }

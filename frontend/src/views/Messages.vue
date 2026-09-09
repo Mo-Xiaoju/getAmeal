@@ -141,7 +141,6 @@ onMounted(() => {
   // 会话列表 / 未读数轮询兜底（覆盖 socket 异常断线场景）
   timer = setInterval(() => {
     refreshConvs()
-    chatStore.refreshUnread()
   }, 15000)
 })
 onBeforeUnmount(() => {
