@@ -3,9 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">管理后台</h1>
-
-        <p class="page-desc">用户与店铺统一管理</p>
-
+        <p class="page-desc">用户、店铺与内容审核统一管理</p>
       </div>
       <el-button :icon="Refresh" plain @click="handleRefresh">刷新</el-button>
     </div>
@@ -119,6 +117,11 @@
           </div>
         </el-card>
       </el-tab-pane>
+
+      <!-- 内容审核 -->
+      <el-tab-pane label="内容审核" name="audit">
+        <AuditQueue />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 店铺编辑弹窗 -->
@@ -211,7 +214,8 @@ const formatDate = (iso) => {
 
 const handleRefresh = () => {
   if (activeTab.value === 'users') loadUsers(1)
-  else loadShops(1)
+  else if (activeTab.value === 'shops') loadShops(1)
+  // audit tab 内部自己处理刷新
 }
 
 // ---- 用户管理 ----
@@ -242,6 +246,7 @@ const handleRoleChange = async (row, role) => {
 const handleActiveChange = async (row, active) => {
   try {
     await updateUser(row.id, { is_active: active })
+    row.is_active = active
     ElMessage.success(active ? '账号已启用' : '账号已停用')
   } catch (e) {
     loadUsers()

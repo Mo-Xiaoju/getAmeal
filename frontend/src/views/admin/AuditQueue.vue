@@ -70,7 +70,7 @@
       <!-- 待审菜品：父店已通过，逐条单独审核 -->
       <el-tab-pane :label="`待审菜品`" name="dishes" lazy>
         <div class="pane-head">
-          <span class="pane-hint">父店已通过审核，同学补充/提交的菜品在此逐条审核</span>
+          <span class="pane-hint">店铺已通过审核，同学补充/提交的菜品在此逐条审核</span>
           <el-button size="small" :icon="Refresh" @click="loadDishes(1)">刷新</el-button>
         </div>
         <el-table v-loading="dishesLoading" :data="dishList" stripe size="small">
@@ -119,7 +119,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 
@@ -271,9 +271,12 @@ const rejectDish = async (row) => {
   }
 }
 
-onMounted(() => {
-  if (!categoryStore.categories.length) categoryStore.fetchCategories()
-  loadShops()
+onMounted(loadShops)
+
+watch(tab, (newTab) => {
+  if (newTab === 'dishes' && !dishList.value.length && !dishesLoading.value) {
+    loadDishes()
+  }
 })
 </script>
 

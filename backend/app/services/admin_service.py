@@ -1,7 +1,10 @@
 """管理后台业务逻辑。"""
-from app.categories import coerce_category
+
+from datetime import datetime
+
+
 from app.extensions import db
-from app.models import School, Shop, User
+from app.models import Dish, School, Shop, User
 from app.utils.exceptions import NotFoundError, ValidationError
 from app.utils.pagination import paginate
 
@@ -171,15 +174,128 @@ class AdminService:
         db.session.commit()
         return _shop_admin_view(shop)
 
+    # ---- 内容审核 ----
     @staticmethod
-    def reclassify_shop_category(shop_id: int, category) -> dict:
-        """管理员归类店铺分类（任意状态均可，含已过审的历史脏值）。
+    def list_audit_shops(params: dict) -> dict:
+        """待审店铺列表（含该店全部待审菜品）。"""
+        query = Shop.query.filter(Shop.status == 'pending').order_by(Shop.id.desc())
+        page = int(params.get('page') or 1)
+        page_size = int(params.get('page_size') or 10)
+        result = paginate(query, page, page_size)
 
-        category 经 coerce_category 强制落规范分类；传空则清空分类。
-        """
+        def _audit_shop_view(shop: Shop) -> dict:
+            view = _shop_admin_view(shop)
+            view['submitter'] = {
+                'id': shop.owner.id,
+                'nickname': shop.owner.nickname,
+                'school_name': shop.owner.school.name if shop.owner.school else None,
+            } if shop.owner else None
+            view['pending_dishes'] = [
+                {
+                    'id': d.id,
+                    'name': d.name,
+                    'price': float(d.price),
+                    'submitter': {
+                        'id': d.owner.id,
+                        'nickname': d.owner.nickname,
+                    } if d.owner else None,
+                }
+                for d in shop.dishes.filter(Dish.status == 'pending').all()
+            ]
+            return view
+
+        return {**result, 'items': [_audit_shop_view(s) for s in result['items']]}
+
+    @staticmethod
+    def list_audit_dishes(params: dict) -> dict:
+        """待审菜品列表（父店已通过的逐条审核）。"""
+        query = Dish.query.join(Shop).filter(
+            Dish.status == 'pending',
+            Shop.status == 'approved'
+        ).order_by(Dish.id.desc())
+
+        page = int(params.get('page') or 1)
+        page_size = int(params.get('page_size') or 10)
+        result = paginate(query, page, page_size)
+
+        def _audit_dish_view(dish: Dish) -> dict:
+            return {
+                'id': dish.id,
+                'name': dish.name,
+                'price': float(dish.price),
+                'shop_id': dish.shop_id,
+                'shop_name': dish.shop.name if dish.shop else None,
+                'submitter': {
+                    'id': dish.owner.id,
+                    'nickname': dish.owner.nickname,
+                } if dish.owner else None,
+                'created_at': dish.created_at.isoformat() if dish.created_at else None,
+            }
+
+        return {**result, 'items': [_audit_dish_view(d) for d in result['items']]}
+
+    @staticmethod
+    def _do_review(entity, admin, action: str, reason: str = None):
+        """通用审核逻辑。"""
+        if action not in ('approve', 'reject'):
+            raise ValidationError(message='action 必须为 approve 或 reject', code=4000)
+        entity.status = 'approved' if action == 'approve' else 'rejected'
+        entity.reviewed_by = admin.id
+        entity.reviewed_at = datetime.utcnow()
+        entity.reject_reason = reason if action == 'reject' else None
+
+    @staticmethod
+    def review_shop(admin, shop_id: int, data: dict) -> dict:
+        """单店审核（通过 / 驳回）。"""
         shop = db.session.get(Shop, shop_id)
-        if shop is None or not shop.is_active:
+        if shop is None:
             raise NotFoundError(message='店铺不存在', code=4040)
-        shop.category = coerce_category(category)
+        if shop.status != 'pending':
+            raise ValidationError(message='该店铺不在待审核状态', code=4000)
+
+        action = data.get('action')
+        reason = data.get('reason')
+        AdminService._do_review(shop, admin, action, reason)
         db.session.commit()
-        return {'id': shop.id, 'name': shop.name, 'category': shop.category}
+        return _shop_admin_view(shop)
+
+    @staticmethod
+    def bulk_review_shop(admin, shop_id: int, data: dict) -> dict:
+        """整店审核：店铺与其全部待审菜品一并通过/驳回。"""
+        shop = db.session.get(Shop, shop_id)
+        if shop is None:
+            raise NotFoundError(message='店铺不存在', code=4040)
+
+        action = data.get('action')
+        reason = data.get('reason')
+
+        AdminService._do_review(shop, admin, action, reason)
+
+        affected = 0
+        for dish in shop.dishes.filter(Dish.status == 'pending').all():
+            AdminService._do_review(dish, admin, action, reason)
+            affected += 1
+
+        db.session.commit()
+        view = _shop_admin_view(shop)
+        view['affected_dishes'] = affected
+        return view
+
+    @staticmethod
+    def review_dish(admin, dish_id: int, data: dict) -> dict:
+        """单菜品审核（通过 / 驳回）。"""
+        dish = db.session.get(Dish, dish_id)
+        if dish is None:
+            raise NotFoundError(message='菜品不存在', code=4040)
+        if dish.status != 'pending':
+            raise ValidationError(message='该菜品不在待审核状态', code=4000)
+
+        action = data.get('action')
+        reason = data.get('reason')
+        AdminService._do_review(dish, admin, action, reason)
+        db.session.commit()
+        return {
+            'id': dish.id,
+            'name': dish.name,
+            'status': dish.status,
+        }

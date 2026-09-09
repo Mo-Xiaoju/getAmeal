@@ -268,10 +268,10 @@ const loadMy = async () => {
   loading.value = true
   try {
     const res = await getMyContributions({ page: 1, page_size: 50 })
-    const payload = res.data.data || {}
-    shops.value = payload.items || []
-    contributedDishes.value = payload.contributed_dishes || []
-    dishTotal.value = payload.dish_total || 0
+    const d = res.data?.data || {}
+    shops.value = d.items || []
+    contributedDishes.value = d.contributed_dishes || []
+    dishTotal.value = d.dish_total || 0
   } finally {
     loading.value = false
   }

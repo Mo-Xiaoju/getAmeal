@@ -66,16 +66,45 @@ def admin_update_user(user_id):
     return ok(AdminService.update_user(g.current_user, user_id, data), message='已更新')
 
 
-@bp_admin.route('/reviews', methods=['GET'])
-def admin_get_reviews():
-    """评价审核列表。"""
-    return ok()  # TODO: AdminService.list_reviews()
+# ---- 内容审核 ----
+@bp_admin.route('/audits/shops', methods=['GET'])
+@require_admin
+def admin_audit_shops():
+    """待审店铺列表（含该店全部待审菜品）。"""
+    params = request.args.to_dict()
+    return ok(AdminService.list_audit_shops(params))
 
 
-@bp_admin.route('/reviews/<int:review_id>', methods=['DELETE'])
-def admin_delete_review(review_id):
-    """删除评价。"""
-    return ok()  # TODO: AdminService.delete_review(review_id)
+@bp_admin.route('/audits/dishes', methods=['GET'])
+@require_admin
+def admin_audit_dishes():
+    """待审菜品列表（父店已通过的逐条审核）。"""
+    params = request.args.to_dict()
+    return ok(AdminService.list_audit_dishes(params))
+
+
+@bp_admin.route('/audits/shops/<int:shop_id>/review', methods=['POST'])
+@require_admin
+def admin_review_shop(shop_id):
+    """单店审核（通过 / 驳回）。"""
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.review_shop(g.current_user, shop_id, data), message='审核完成')
+
+
+@bp_admin.route('/audits/shops/<int:shop_id>/bulk', methods=['POST'])
+@require_admin
+def admin_bulk_review_shop(shop_id):
+    """整店审核：店铺与其全部待审菜品一并通过/驳回。"""
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.bulk_review_shop(g.current_user, shop_id, data), message='审核完成')
+
+
+@bp_admin.route('/audits/dishes/<int:dish_id>/review', methods=['POST'])
+@require_admin
+def admin_review_dish(dish_id):
+    """单菜品审核（通过 / 驳回）。"""
+    data = request.get_json(silent=True) or {}
+    return ok(AdminService.review_dish(g.current_user, dish_id, data), message='审核完成')
 
 
 @bp_admin.route('/stats', methods=['GET'])
