@@ -74,6 +74,24 @@ const routes = [
     props: { mode: 'followers' },
   },
   {
+    path: '/profile/favorites',
+    name: 'favorites',
+    component: () => import('../views/FavoritesList.vue'),
+    meta: { title: '我的收藏', requiresAuth: true },
+  },
+  {
+    path: '/profile/likes',
+    name: 'likes',
+    component: () => import('../views/LikesList.vue'),
+    meta: { title: '我的点赞', requiresAuth: true },
+  },
+  {
+    path: '/profile/history',
+    name: 'history',
+    component: () => import('../views/HistoryList.vue'),
+    meta: { title: '浏览记录', requiresAuth: true },
+  },
+  {
     path: '/merchant',
     name: 'merchant',
     component: () => import('../views/Merchant.vue'),

@@ -29,7 +29,13 @@
       <div v-loading="loading" class="shop-grid">
         <div v-for="shop in shops" :key="shop.id" class="shop-card">
           <div class="shop-card-head">
-            <img v-if="shop.image_url" :src="shop.image_url" class="shop-cover" alt="" />
+            <img
+              v-if="shop.image_url"
+              :src="shop.image_url"
+              class="shop-cover"
+              alt=""
+              @click.stop="openImage([shop.image_url], 0)"
+            />
             <div v-else class="shop-cover placeholder"><el-icon><Shop /></el-icon></div>
             <el-tag size="small" :type="shop.status === 'approved' ? 'success' : 'warning'" effect="light">
               {{ statusText(shop.status) }}
@@ -104,8 +110,8 @@
           <el-form-item label="描述">
             <el-input v-model="dishForm.description" maxlength="500" />
           </el-form-item>
-          <el-form-item label="菜品图">
-            <ImageField v-model="dishForm.image_url" :size="72" />
+          <el-form-item label="菜品图（可多张，最多 9 张）">
+            <MultiImageField v-model="dishForm.images" :size="76" />
           </el-form-item>
           <el-form-item label="标签（逗号分隔）">
             <el-input v-model="dishForm.tags" placeholder="例如：招牌,下饭" />
@@ -149,7 +155,13 @@
       <div v-loading="claimLoading" class="claim-list">
         <div v-for="shop in claimableShops" :key="shop.id" class="claim-item">
           <div class="claim-info">
-            <img v-if="shop.image_url" :src="shop.image_url" class="claim-cover" alt="" />
+            <img
+              v-if="shop.image_url"
+              :src="shop.image_url"
+              class="claim-cover"
+              alt=""
+              @click.stop="openImage([shop.image_url], 0)"
+            />
             <div v-else class="claim-cover placeholder"><el-icon><Shop /></el-icon></div>
             <div class="claim-text">
               <div class="claim-name">{{ shop.name }}</div>
@@ -196,6 +208,8 @@ import {
   updateShop,
 } from '@/api/merchant'
 import ImageField from '@/components/ImageField.vue'
+import MultiImageField from '@/components/MultiImageField.vue'
+import { openImage } from '@/composables/useImageViewer'
 import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 
@@ -315,7 +329,7 @@ const handleClaim = async (shop) => {
 const dishDrawer = reactive({ show: false, shop: null })
 const dishLoading = ref(false)
 const dishes = ref([])
-const dishForm = reactive({ name: '', price: 0, description: '', tags: '', image_url: '', editId: null })
+const dishForm = reactive({ name: '', price: 0, description: '', tags: '', images: [], editId: null })
 
 const openDishDrawer = async (shop) => {
   dishDrawer.shop = shop
@@ -329,7 +343,7 @@ const resetDishForm = () => {
   dishForm.price = 0
   dishForm.description = ''
   dishForm.tags = ''
-  dishForm.image_url = ''
+  dishForm.images = []
   dishForm.editId = null
 }
 
@@ -354,8 +368,7 @@ const handleAddDish = async () => {
       name: dishForm.name.trim(),
       price: dishForm.price,
       description: dishForm.description?.trim() || undefined,
-      // '' 可清除已存菜品图（后端 update 仅在值非 None 时 setattr）
-      image_url: dishForm.image_url?.trim() || '',
+      images: dishForm.images,
       tags: dishForm.tags ? dishForm.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
     }
     if (dishForm.editId) {
@@ -378,7 +391,7 @@ const openDishEdit = (dish) => {
   dishForm.price = Number(dish.price)
   dishForm.description = dish.description || ''
   dishForm.tags = (dish.tags || []).join(',')
-  dishForm.image_url = dish.image_url || ''
+  dishForm.images = dish.images?.length ? [...dish.images] : dish.image_url ? [dish.image_url] : []
 }
 
 const handleDeleteDish = async (dish) => {

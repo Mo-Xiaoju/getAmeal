@@ -75,6 +75,15 @@
                 <el-dropdown-item v-if="!userStore.isMerchant" command="contribute">
                   <el-icon><EditPen /></el-icon>提交商户 / 菜单
                 </el-dropdown-item>
+                <el-dropdown-item v-if="!userStore.isMerchant" command="favorites">
+                  <el-icon><Star /></el-icon>我的收藏
+                </el-dropdown-item>
+                <el-dropdown-item v-if="!userStore.isMerchant" command="likes">
+                  <el-icon><Pointer /></el-icon>我的点赞
+                </el-dropdown-item>
+                <el-dropdown-item v-if="!userStore.isMerchant" command="history">
+                  <el-icon><Clock /></el-icon>浏览记录
+                </el-dropdown-item>
                 <el-dropdown-item v-if="userStore.isAdmin" command="admin">
                   <el-icon><Setting /></el-icon>管理后台
                 </el-dropdown-item>
@@ -95,7 +104,8 @@ import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowDown, Bowl, ChatLineRound, EditPen, School, Setting, Shop, SwitchButton, User,
+  ArrowDown, Bowl, ChatLineRound, Clock, EditPen, Pointer, School, Setting, Shop,
+  Star, SwitchButton, User,
 } from '@element-plus/icons-vue'
 
 import { useChatStore } from '@/store/chat'
@@ -145,6 +155,12 @@ const handleCommand = async (command) => {
     router.push('/merchant')
   } else if (command === 'contribute') {
     router.push('/contribute')
+  } else if (command === 'favorites') {
+    router.push('/profile/favorites')
+  } else if (command === 'likes') {
+    router.push('/profile/likes')
+  } else if (command === 'history') {
+    router.push('/profile/history')
   } else if (command === 'admin') {
     router.push('/admin')
   } else if (command === 'logout') {

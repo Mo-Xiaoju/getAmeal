@@ -16,7 +16,8 @@ class Dish(db.Model):
     name = db.Column(db.String(100), nullable=False)                 # 菜品名
     price = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # 单价（元）
     description = db.Column(db.String(500), nullable=True)           # 描述
-    image_url = db.Column(db.String(255), nullable=True)             # 图片
+    image_url = db.Column(db.String(255), nullable=True)             # 封面图（= 第一张图，兼容旧读取端）
+    images = db.Column(db.Text, nullable=True)                        # 图片地址（JSON 数组字符串，权威图集）
     tags = db.Column(db.String(200), nullable=True)                  # 标签，逗号分隔：辣/招牌/素食
     avg_rating = db.Column(db.Float, nullable=False, default=0.0)    # 平均评分
     rating_count = db.Column(db.Integer, nullable=False, default=0)  # 评分人数

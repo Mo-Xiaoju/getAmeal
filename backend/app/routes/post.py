@@ -1,6 +1,7 @@
 """探店笔记相关路由。"""
 from flask import Blueprint, g, request
 
+from app.services.activity_service import ActivityService
 from app.services.post_service import PostService
 from app.utils.decorators import optional_login, require_consumer, require_login
 from app.utils.responses import ok
@@ -35,8 +36,10 @@ def get_my_posts():
 @bp_post.route('/<int:post_id>', methods=['GET'])
 @optional_login
 def get_post_detail(post_id):
-    """笔记详情（带登录态时回显点赞/收藏/关注状态）。"""
-    return ok(PostService.get_detail(post_id))
+    """笔记详情（带登录态时回显点赞/收藏/关注状态，并记录进浏览历史）。"""
+    data = PostService.get_detail(post_id)
+    ActivityService.record_view(getattr(g, 'current_user', None), 'post', post_id)
+    return ok(data)
 
 
 @bp_post.route('/<int:post_id>', methods=['DELETE'])

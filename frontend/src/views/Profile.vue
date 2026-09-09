@@ -1,9 +1,19 @@
 <template>
   <div class="profile">
     <div class="profile-card">
-      <!-- 头像：本地上传优先（URL 备择），保存后即时刷新全局头像 -->
+      <!-- 头像：点击头像框上传 / 更换；已有头像可一键移除（上传即持久化） -->
       <div class="avatar-field">
-        <ImageField v-model="avatarUrl" circle :size="88" :disabled="avatarSaving" />
+        <ImageField v-model="avatarUrl" circle :size="88" :closable="false" :disabled="avatarSaving" />
+      </div>
+      <div class="avatar-ops">
+        <el-button
+          v-if="hasAvatar"
+          text
+          type="danger"
+          size="small"
+          :loading="avatarSaving"
+          @click="removeAvatar"
+        >移除头像</el-button>
       </div>
 
       <h2 class="profile-name">{{ userStore.nickname || userStore.userInfo?.username }}</h2>
@@ -42,6 +52,11 @@
         <template v-else>
           <el-button type="primary" plain @click="router.push('/posts?mine=1')">我的笔记</el-button>
           <el-button plain @click="router.push('/posts/create')">发布笔记</el-button>
+          <div class="quick-links">
+            <el-button text type="primary" @click="router.push('/profile/favorites')">我的收藏</el-button>
+            <el-button text type="primary" @click="router.push('/profile/likes')">我的点赞</el-button>
+            <el-button text type="primary" @click="router.push('/profile/history')">浏览记录</el-button>
+          </div>
         </template>
       </div>
 
@@ -116,6 +131,12 @@ async function onAvatarChange(val) {
   }
 }
 
+const hasAvatar = computed(() => !!userStore.userInfo?.avatar_url)
+// 头像移除：置空由 avatarUrl 的 setter 走 onAvatarChange 持久化
+const removeAvatar = () => {
+  avatarUrl.value = ''
+}
+
 // 账号绑定的学校（优先本地已选学校，其次账号资料里的学校）
 const boundSchool = computed(
   () => schoolStore.currentSchool || userStore.userInfo?.school || null
@@ -179,6 +200,12 @@ const handleLogout = async () => {
 .avatar-field {
   display: flex;
   justify-content: center;
+}
+.avatar-ops {
+  display: flex;
+  justify-content: center;
+  min-height: 24px;
+  margin-top: 4px;
 }
 .profile-name {
   margin: 16px 0 4px;
@@ -257,5 +284,13 @@ const handleLogout = async () => {
 .profile-actions {
   margin-top: 24px;
   text-align: left;
+}
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #ebeef5;
 }
 </style>

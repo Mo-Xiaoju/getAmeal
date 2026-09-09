@@ -41,7 +41,16 @@
             class="circle-card"
             @click="router.push(`/circles/${c.id}`)"
           >
-            <div class="cover" :style="coverStyle(c)">
+            <!-- 封面：前景图实现以便点击放大；无封面给渐变底；封面区预览、其余区域整卡跳圈 -->
+            <div class="cover" @click.stop="previewCover(c)">
+              <img
+                v-if="c.cover_url"
+                :src="c.cover_url"
+                class="cover-img"
+                alt=""
+                loading="lazy"
+                @error="$event.target.style.display = 'none'"
+              />
               <div class="cover-joined" v-if="c.joined">已加入</div>
               <div class="cover-name">{{ c.name }}</div>
             </div>
@@ -112,6 +121,7 @@ import { ElMessage } from 'element-plus'
 import { ChatRound, Plus, Search, UserFilled } from '@element-plus/icons-vue'
 
 import ImageField from '@/components/ImageField.vue'
+import { openImage } from '@/composables/useImageViewer'
 import Pagination from '@/components/Pagination.vue'
 import { useCircleStore } from '@/store/circle'
 import { useSchoolStore } from '@/store/school'
@@ -136,10 +146,9 @@ async function loadList(page = 1) {
   await circleStore.fetchList({ school_id: schoolId(), keyword: keyword.value.trim(), page, page_size: 12 })
 }
 
-function coverStyle(c) {
-  return c.cover_url
-    ? { backgroundImage: `url(${c.cover_url})` }
-    : { background: 'linear-gradient(135deg, #f6c453, #f5a623)' }
+// 点击圈卡封面：放大查看封面；无封面则走整卡默认跳圈（openImage 内部直接 return）
+function previewCover(c) {
+  if (c.cover_url) openImage([c.cover_url], 0)
 }
 
 function openCreate() {
@@ -260,15 +269,26 @@ onMounted(() => loadList(1))
   transform: translateY(-2px);
 }
 .cover {
-  height: 110px;
-  background-size: cover;
-  background-position: center;
   position: relative;
+  height: 110px;
+  overflow: hidden;
+  cursor: zoom-in;
+  /* 无封面兜底渐变（原 inline background 移入 class） */
+  background: linear-gradient(135deg, #f6c453, #f5a623);
+}
+.cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .cover-joined {
   position: absolute;
   top: 10px;
   right: 10px;
+  z-index: 1;
   font-size: 12px;
   color: #fff;
   background: rgba(0, 0, 0, 0.45);
@@ -279,6 +299,7 @@ onMounted(() => loadList(1))
   position: absolute;
   left: 12px;
   bottom: 10px;
+  z-index: 1;
   color: #fff;
   font-size: 17px;
   font-weight: 700;

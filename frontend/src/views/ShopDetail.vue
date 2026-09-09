@@ -4,7 +4,13 @@
     <div v-if="shopStore.shopDetail" class="detail-main">
       <div class="shop-hero">
         <div class="shop-cover">
-          <img v-if="shop.image_url" :src="shop.image_url" :alt="shop.name" @error="imageFailed = true" />
+          <img
+            v-if="shop.image_url"
+            :src="shop.image_url"
+            :alt="shop.name"
+            @error="imageFailed = true"
+            @click.stop="openImage([shop.image_url], 0)"
+          />
           <div v-else class="cover-fallback">
             <el-icon><Food /></el-icon>
           </div>
@@ -132,8 +138,8 @@
         <el-form-item label="描述">
           <el-input v-model="dishDialog.form.description" maxlength="500" />
         </el-form-item>
-        <el-form-item label="菜品图">
-          <ImageField v-model="dishDialog.form.image_url" :size="72" />
+        <el-form-item label="菜品图（可多张，最多 9 张）">
+          <MultiImageField v-model="dishDialog.form.images" :size="76" />
         </el-form-item>
         <el-form-item label="标签（逗号分隔）">
           <el-input v-model="dishDialog.form.tags" placeholder="例如：招牌,下饭" />
@@ -155,7 +161,8 @@ import { EditPen, Food, Location, Plus, Shop, Star, StarFilled } from '@element-
 
 import { submitDish } from '@/api/contribute'
 import DishCard from '@/components/DishCard.vue'
-import ImageField from '@/components/ImageField.vue'
+import MultiImageField from '@/components/MultiImageField.vue'
+import { openImage } from '@/composables/useImageViewer'
 import Pagination from '@/components/Pagination.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { useDishStore } from '@/store/dish'
@@ -202,11 +209,11 @@ const emptyDishesText = computed(() =>
 const dishDialog = reactive({
   show: false,
   submitting: false,
-  form: { name: '', price: 0, description: '', tags: '', image_url: '' },
+  form: { name: '', price: 0, description: '', tags: '', images: [] },
 })
 
 const resetDishForm = () => {
-  dishDialog.form = { name: '', price: 0, description: '', tags: '', image_url: '' }
+  dishDialog.form = { name: '', price: 0, description: '', tags: '', images: [] }
 }
 
 const openDishDialog = () => {
@@ -227,7 +234,7 @@ const handleSubmitDish = async () => {
       name: form.name.trim(),
       price: form.price,
       description: form.description?.trim() || undefined,
-      image_url: form.image_url?.trim() || '',
+      images: form.images,
       tags: form.tags ? form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
     })
     ElMessage.success('菜品已提交，审核通过后展示')
@@ -330,6 +337,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 .cover-fallback {
   height: 100%;

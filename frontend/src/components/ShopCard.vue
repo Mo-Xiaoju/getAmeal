@@ -1,7 +1,14 @@
 <template>
   <div class="shop-card" @click="goDetail">
     <div class="shop-cover">
-      <img v-if="shop.image_url" :src="shop.image_url" :alt="shop.name" loading="lazy" @error="imageFailed = true" />
+      <img
+        v-if="shop.image_url"
+        :src="shop.image_url"
+        :alt="shop.name"
+        loading="lazy"
+        @error="imageFailed = true"
+        @click.stop="openImage([shop.image_url], 0)"
+      />
       <div v-else-if="imageFailed" class="cover-fallback">
         <el-icon><Food /></el-icon>
       </div>
@@ -38,6 +45,8 @@ import { Food, Location } from '@element-plus/icons-vue'
 
 import RatingStars from '@/components/RatingStars.vue'
 
+import { openImage } from '@/composables/useImageViewer'
+
 // 店铺卡片：店铺列表 / 收藏列表 / 推荐区复用
 const props = defineProps({
   shop: { type: Object, required: true },
@@ -73,6 +82,7 @@ const goDetail = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 .cover-fallback {
   height: 100%;

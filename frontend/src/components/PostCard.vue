@@ -15,7 +15,7 @@
     <p class="post-content">{{ post.content }}</p>
 
     <div v-if="post.images && post.images.length" class="post-cover">
-      <img :src="post.images[0]" :alt="post.title" loading="lazy" @error="imageFailed = true" />
+      <img :src="post.images[0]" :alt="post.title" loading="lazy" @error="imageFailed = true" @click.stop="openImage(post.images, 0)" />
     </div>
 
     <div v-if="post.rec_reason && post.rec_reason.length" class="rec-reason">
@@ -39,6 +39,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChatDotRound, Star, StarFilled } from '@element-plus/icons-vue'
+
+import { openImage } from '@/composables/useImageViewer'
 
 // 笔记卡片：笔记列表 / 首页最新笔记复用
 const props = defineProps({
@@ -120,6 +122,7 @@ const goDetail = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 .rec-reason {
   display: flex;

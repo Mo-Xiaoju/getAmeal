@@ -22,7 +22,13 @@
       <div v-loading="loading" class="shop-grid">
         <div v-for="shop in shops" :key="shop.id" class="shop-card">
           <div class="shop-card-head">
-            <img v-if="shop.image_url" :src="shop.image_url" class="shop-cover" alt="" />
+            <img
+              v-if="shop.image_url"
+              :src="shop.image_url"
+              class="shop-cover"
+              alt=""
+              @click.stop="openImage([shop.image_url], 0)"
+            />
             <div v-else class="shop-cover placeholder"><el-icon><Shop /></el-icon></div>
             <el-tag size="small" :type="statusTagType(shop.status)" effect="light">
               {{ statusText(shop.status) }}
@@ -140,8 +146,8 @@
           <el-form-item label="描述">
             <el-input v-model="dishForm.description" maxlength="500" />
           </el-form-item>
-          <el-form-item label="菜品图">
-            <ImageField v-model="dishForm.image_url" :size="72" />
+          <el-form-item label="菜品图（可多张，最多 9 张）">
+            <MultiImageField v-model="dishForm.images" :size="76" />
           </el-form-item>
           <el-form-item label="标签（逗号分隔）">
             <el-input v-model="dishForm.tags" placeholder="例如：招牌,下饭" />
@@ -199,8 +205,8 @@
         <el-form-item label="描述">
           <el-input v-model="contributedDialog.form.description" maxlength="500" />
         </el-form-item>
-        <el-form-item label="菜品图">
-          <ImageField v-model="contributedDialog.form.image_url" :size="72" />
+        <el-form-item label="菜品图（可多张，最多 9 张）">
+          <MultiImageField v-model="contributedDialog.form.images" :size="76" />
         </el-form-item>
         <el-form-item label="标签（逗号分隔）">
           <el-input v-model="contributedDialog.form.tags" placeholder="例如：招牌,下饭" />
@@ -230,6 +236,8 @@ import {
   updateSubmittedShop,
 } from '@/api/contribute'
 import ImageField from '@/components/ImageField.vue'
+import MultiImageField from '@/components/MultiImageField.vue'
+import { openImage } from '@/composables/useImageViewer'
 import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 
@@ -321,7 +329,7 @@ const handleDeleteShop = async (shop) => {
 
 // ---- 菜单管理（数据来自 list_my 内嵌 dishes，操作后整体刷新）----
 const dishDrawer = reactive({ show: false, shop: null })
-const dishForm = reactive({ name: '', price: 0, description: '', tags: '', image_url: '', editId: null })
+const dishForm = reactive({ name: '', price: 0, description: '', tags: '', images: [], editId: null })
 
 const drawerDishes = computed(() => {
   if (!dishDrawer.shop) return []
@@ -347,7 +355,7 @@ const resetDishForm = () => {
   dishForm.price = 0
   dishForm.description = ''
   dishForm.tags = ''
-  dishForm.image_url = ''
+  dishForm.images = []
   dishForm.editId = null
 }
 
@@ -362,8 +370,7 @@ const handleAddDish = async () => {
       name: dishForm.name.trim(),
       price: dishForm.price,
       description: dishForm.description?.trim() || undefined,
-      // '' 可清除已存菜品图（后端 update 仅在值非 None 时 setattr）
-      image_url: dishForm.image_url?.trim() || '',
+      images: dishForm.images,
       tags: dishForm.tags ? dishForm.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
     }
     if (dishForm.editId) {
@@ -386,7 +393,7 @@ const openDishEdit = (dish) => {
   dishForm.price = Number(dish.price)
   dishForm.description = dish.description || ''
   dishForm.tags = (dish.tags || []).join(',')
-  dishForm.image_url = dish.image_url || ''
+  dishForm.images = dish.images?.length ? [...dish.images] : dish.image_url ? [dish.image_url] : []
 }
 
 const handleDeleteDish = async (dish) => {
@@ -408,7 +415,7 @@ const emptyContributedForm = () => ({
   price: 0,
   description: '',
   tags: '',
-  image_url: '',
+  images: [],
 })
 const contributedDialog = reactive({ show: false, form: emptyContributedForm() })
 
@@ -420,7 +427,7 @@ const openContributedEdit = (dish) => {
     price: Number(dish.price),
     description: dish.description || '',
     tags: (dish.tags || []).join(','),
-    image_url: dish.image_url || '',
+    images: dish.images?.length ? [...dish.images] : dish.image_url ? [dish.image_url] : [],
   }
   contributedDialog.show = true
 }
@@ -437,7 +444,7 @@ const handleSaveContributed = async () => {
       name: form.name.trim(),
       price: form.price,
       description: form.description?.trim() || undefined,
-      image_url: form.image_url?.trim() || '',
+      images: form.images,
       tags: form.tags ? form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
     })
     ElMessage.success('已更新，重新提交审核')

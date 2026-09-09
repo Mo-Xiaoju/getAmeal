@@ -1,6 +1,7 @@
 """菜品相关路由。"""
 from flask import Blueprint, g, request
 
+from app.services.activity_service import ActivityService
 from app.services.dish_service import DishService
 from app.services.recommend_service import RecommendService
 from app.utils.decorators import optional_login
@@ -18,9 +19,12 @@ def get_dish_recommend():
 
 
 @bp_dish.route('/<int:dish_id>', methods=['GET'])
+@optional_login
 def get_dish_detail(dish_id):
-    """菜品详情。"""
-    return ok(DishService.get_detail(dish_id))
+    """菜品详情（登录浏览时记录进历史）。"""
+    data = DishService.get_detail(dish_id)
+    ActivityService.record_view(getattr(g, 'current_user', None), 'dish', dish_id)
+    return ok(data)
 
 
 @bp_dish.route('', methods=['GET'], strict_slashes=False)

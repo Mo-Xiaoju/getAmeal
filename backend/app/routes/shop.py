@@ -2,6 +2,7 @@
 from flask import Blueprint, g, request
 
 from app.categories import CATEGORIES
+from app.services.activity_service import ActivityService
 from app.services.dish_service import DishService
 from app.services.recommend_service import RecommendService
 from app.services.shop_service import ShopService
@@ -42,8 +43,10 @@ def get_shop_dishes(shop_id):
 @bp_shop.route('/<int:shop_id>', methods=['GET'])
 @optional_login
 def get_shop_detail(shop_id):
-    """店铺详情（带登录态时回显是否已收藏）。"""
-    return ok(ShopService.get_detail(shop_id))
+    """店铺详情（带登录态时回显是否已收藏，并记录进浏览历史）。"""
+    data = ShopService.get_detail(shop_id)
+    ActivityService.record_view(getattr(g, 'current_user', None), 'shop', shop_id)
+    return ok(data)
 
 
 @bp_shop.route('/<int:shop_id>/reviews', methods=['GET'])

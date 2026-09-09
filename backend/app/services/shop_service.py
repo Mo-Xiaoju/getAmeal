@@ -144,20 +144,6 @@ class ShopService:
         """是否已收藏（详情页回显用）。"""
         return Favorite.query.filter_by(user_id=user.id, shop_id=shop_id).first() is not None
 
-    @staticmethod
-    def list_favorites(user, params: dict) -> dict:
-        """当前用户收藏列表（分页，含店铺信息）。"""
-        query = Favorite.query.filter_by(user_id=user.id).order_by(Favorite.created_at.desc())
-        page = int(params.get('page') or 1)
-        page_size = int(params.get('page_size') or 10)
-        result = paginate(query, page, page_size)
-        items = [
-            {'id': fav.id, 'shop_id': fav.shop_id, 'created_at': fav.created_at,
-             'shop': _shop_schema.dump(fav.shop) if fav.shop else None}
-            for fav in result['items']
-        ]
-        return {**result, 'items': items}
-
     # ---- 我的评价 ----
     @staticmethod
     def list_my_reviews(user, params: dict) -> dict:

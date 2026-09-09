@@ -5,6 +5,7 @@ from app.categories import normalize_category_payload
 from app.extensions import db
 from app.models import Dish, Shop, User
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
+from app.services.dish_service import apply_dish_images_for_create, sync_dish_images
 from app.schemas.shop import ShopCreateSchema, ShopSchema, ShopUpdateSchema
 from app.utils.exceptions import ApiError, NotFoundError, PermissionError, ValidationError
 from app.utils.pagination import paginate
@@ -179,6 +180,7 @@ class MerchantService:
         """给自己的店铺添加菜品（创建即 approved，归属商户本人）。"""
         _get_owned_shop(user, shop_id)
         data = DishCreateSchema().load(data)
+        apply_dish_images_for_create(data)
         tags = ','.join(t.strip() for t in data.pop('tags') or [] if t and t.strip())
         dish = Dish(shop_id=shop_id, owner_id=user.id, status='approved', tags=tags or None, **data)
         db.session.add(dish)
@@ -190,6 +192,8 @@ class MerchantService:
         """修改自己店铺下的菜品（商户本人维护的内容直接发布，无需再审核）。"""
         dish = _get_owned_dish(user, dish_id)
         data = DishUpdateSchema().load(data)
+        # 图集单独处理（含封面），摘出后其余字段照旧走通用循环
+        sync_dish_images(dish, data)
         for key, value in data.items():
             if value is None:
                 continue

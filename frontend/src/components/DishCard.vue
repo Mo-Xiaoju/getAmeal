@@ -1,7 +1,14 @@
 <template>
   <div class="dish-card" @click="goDetail">
     <div class="dish-cover">
-      <img v-if="dish.image_url" :src="dish.image_url" :alt="dish.name" loading="lazy" @error="imageFailed = true" />
+      <img
+        v-if="dish.image_url"
+        :src="dish.image_url"
+        :alt="dish.name"
+        loading="lazy"
+        @error="imageFailed = true"
+        @click.stop="openImage(dish.images && dish.images.length ? dish.images : [dish.image_url], 0)"
+      />
       <div v-else class="cover-fallback">
         <el-icon><Food /></el-icon>
       </div>
@@ -30,6 +37,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Food, StarFilled } from '@element-plus/icons-vue'
+
+import { openImage } from '@/composables/useImageViewer'
 
 // 菜品卡片：店铺详情 / 推荐区复用
 const props = defineProps({
@@ -68,6 +77,7 @@ const goDetail = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  cursor: zoom-in;
 }
 .cover-fallback {
   height: 100%;

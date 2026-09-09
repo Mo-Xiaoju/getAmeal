@@ -38,14 +38,8 @@
           </div>
         </el-form-item>
 
-        <el-form-item label="图片（本地上传优先，URL 备择；支持多张）">
-          <div class="image-inputs">
-            <div v-for="(img, i) in form.images" :key="i" class="image-input-row">
-              <ImageField v-model="form.images[i]" :size="76" />
-              <el-button :icon="Delete" circle type="danger" plain @click="removeImage(i)" />
-            </div>
-            <el-button :icon="Plus" plain @click="addImage">添加图片</el-button>
-          </div>
+        <el-form-item label="图片（最多 9 张；上传一张后，右侧自动新增一个上传位）">
+          <MultiImageField v-model="form.images" :size="96" />
         </el-form-item>
 
         <div class="form-actions">
@@ -61,9 +55,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Delete, Plus } from '@element-plus/icons-vue'
 
-import ImageField from '@/components/ImageField.vue'
+import MultiImageField from '@/components/MultiImageField.vue'
 import { usePostStore } from '@/store/post'
 import { useSchoolStore } from '@/store/school'
 import { useShopStore } from '@/store/shop'
@@ -81,14 +74,8 @@ const form = reactive({
   content: '',
   tags: '',
   shop_id: null,
-  images: [''],
+  images: [],
 })
-
-const addImage = () => form.images.push('')
-const removeImage = (i) => {
-  form.images.splice(i, 1)
-  if (!form.images.length) form.images.push('')
-}
 
 const handleSubmit = async () => {
   const title = form.title.trim()
@@ -145,20 +132,6 @@ onMounted(async () => {
   border: 1px solid #ebeef5;
   border-radius: 16px;
   padding: 28px 32px;
-}
-.image-inputs {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.image-input-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.image-input-row .el-input {
-  flex: 1;
 }
 .form-actions {
   display: flex;

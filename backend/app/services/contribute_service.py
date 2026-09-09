@@ -13,6 +13,7 @@ from app.extensions import db
 from app.models import Dish, Shop
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
 from app.schemas.shop import ShopCreateSchema, ShopSchema, ShopUpdateSchema
+from app.services.dish_service import apply_dish_images_for_create, sync_dish_images
 from app.utils.exceptions import ApiError, NotFoundError, PermissionError, ValidationError
 
 _shop_schema = ShopSchema()
@@ -211,6 +212,7 @@ class ContributeService:
         shop = _get_contribute_target_shop(user, shop_id)
         data = DishCreateSchema().load(data)
         _ensure_unique_dish(shop.id, data['name'])
+        apply_dish_images_for_create(data)
         tags = ','.join(t.strip() for t in data.pop('tags') or [] if t and t.strip())
         dish = Dish(shop_id=shop.id, owner_id=user.id, status='pending', tags=tags or None, **data)
         db.session.add(dish)
@@ -224,19 +226,19 @@ class ContributeService:
         data = DishUpdateSchema().load(data)
         if data.get('name') is not None:
             _ensure_unique_dish(dish.shop_id, data['name'], exclude_id=dish.id)
+        # 图集单独处理（含封面）：未改图（含“原本就无图、这次仍传空”）不算变更，不触发重审
+        images_changed = sync_dish_images(dish, data)
         changed = False
         for key, value in data.items():
             if value is None:
                 continue
             if key == 'tags':
                 value = ','.join(t.strip() for t in value if t.strip()) or None
-            if key == 'image_url' and value == '':
-                value = None  # 清空菜品图（空串与 None 等价，避免误判触发重审）
             if getattr(dish, key, None) == value:
                 continue
             setattr(dish, key, value)
             changed = True
-        if changed:
+        if changed or images_changed:
             _reset_audit(dish)
         db.session.commit()
         return _dish_schema.dump(dish)

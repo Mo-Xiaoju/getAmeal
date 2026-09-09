@@ -5,6 +5,8 @@
       <router-view />
     </main>
     <Footer />
+    <!-- 全站图片放大查看器（单实例，跨路由、盖住弹层） -->
+    <ImageViewer />
   </div>
 </template>
 
@@ -13,6 +15,7 @@
 import { watch } from 'vue'
 
 import Footer from './components/Footer.vue'
+import ImageViewer from './components/ImageViewer.vue'
 import NavBar from './components/NavBar.vue'
 import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'

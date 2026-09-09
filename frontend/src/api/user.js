@@ -6,8 +6,14 @@ export const getProfile = () => request.get('/user/profile')
 // 更新个人信息，data: { nickname, avatar_url }
 export const updateProfile = (data) => request.put('/user/profile', data)
 
-// 我的收藏列表，params: { page, page_size }
+// 我的收藏列表（店铺/笔记），params: { type: shop|post|all, page, page_size }
 export const getFavorites = (params) => request.get('/user/favorites', { params })
+
+// 我的点赞列表，params: { page, page_size }
+export const getMyLikes = (params) => request.get('/user/likes', { params })
+
+// 我的浏览记录（店铺/菜品/笔记），params: { type: shop|dish|post|all, page, page_size }
+export const getViewHistory = (params) => request.get('/user/history', { params })
 
 // 我的评价列表，params: { page, page_size }
 export const getMyReviews = (params) => request.get('/user/reviews', { params })

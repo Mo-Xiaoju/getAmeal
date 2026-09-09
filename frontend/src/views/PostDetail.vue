@@ -50,6 +50,7 @@
           :alt="`图片${i + 1}`"
           loading="lazy"
           @error="$event.target.style.display = 'none'"
+          @click="openImage(post.images, i)"
         />
       </div>
 
@@ -122,6 +123,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Shop, Star, StarFilled } from '@element-plus/icons-vue'
 
+import { openImage } from '@/composables/useImageViewer'
 import { usePostStore } from '@/store/post'
 import { useUserStore } from '@/store/user'
 
@@ -295,6 +297,7 @@ onMounted(async () => {
 .post-images img {
   width: 100%;
   border-radius: 8px;
+  cursor: zoom-in;
 }
 .action-bar {
   display: flex;

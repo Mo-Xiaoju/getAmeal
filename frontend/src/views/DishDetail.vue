@@ -7,10 +7,37 @@
     <div v-if="dishStore.dishDetail" class="dish-main">
       <!-- 菜品信息 -->
       <div class="dish-hero">
-        <div class="dish-cover">
-          <img v-if="dish.image_url" :src="dish.image_url" :alt="dish.name" @error="imageFailed = true" />
-          <div v-else class="cover-fallback">
-            <el-icon><Food /></el-icon>
+        <div class="dish-media">
+          <div class="dish-cover">
+            <!-- 大图预览：点击可进入 Element 全屏查看（图集内左右翻） -->
+            <el-image
+              v-if="images.length"
+              :src="images[activeIdx]"
+              :preview-src-list="images"
+              :initial-index="activeIdx"
+              :preview-teleported="true"
+              fit="cover"
+              class="dish-main-img"
+            >
+              <template #error>
+                <div class="cover-fallback"><el-icon><Food /></el-icon></div>
+              </template>
+            </el-image>
+            <div v-else class="cover-fallback">
+              <el-icon><Food /></el-icon>
+            </div>
+          </div>
+          <!-- 缩略图栏：点击切换大图 -->
+          <div v-if="images.length > 1" class="dish-thumbs">
+            <div
+              v-for="(img, i) in images"
+              :key="i"
+              class="dish-thumb"
+              :class="{ active: i === activeIdx }"
+              @click="activeIdx = i"
+            >
+              <img :src="img" :alt="`${dish.name} ${i + 1}`" />
+            </div>
           </div>
         </div>
         <div class="dish-info">
@@ -62,7 +89,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Food, Shop } from '@element-plus/icons-vue'
 
@@ -77,7 +104,20 @@ const shopStore = useShopStore()
 
 const dishId = computed(() => Number(route.params.id))
 const dish = computed(() => dishStore.dishDetail || {})
-const imageFailed = ref(false)
+// 图集：优先接口返回的 images；历史/单图菜品回退为 [image_url]
+const images = computed(() => {
+  const imgs = dish.value.images || []
+  if (imgs.length) return imgs
+  return dish.value.image_url ? [dish.value.image_url] : []
+})
+const activeIdx = ref(0) // 当前大图索引
+// 切换到其它菜品时回到第一张
+watch(
+  () => dishStore.dishDetail?.id,
+  () => {
+    activeIdx.value = 0
+  },
+)
 const reviewsLoading = ref(false)
 const reviews = ref([])
 const reviewTotal = ref(0)
@@ -122,17 +162,24 @@ onMounted(async () => {
   border-radius: 16px;
   padding: 20px;
 }
-.dish-cover {
+.dish-media {
   flex: 0 0 320px;
+}
+.dish-cover {
+  width: 320px;
   height: 200px;
   border-radius: 12px;
   overflow: hidden;
   background: var(--el-color-primary-light-9);
 }
-.dish-cover img {
+.dish-main-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  display: block;
+}
+.dish-cover :deep(.el-image__inner) {
+  width: 100%;
+  height: 100%;
 }
 .cover-fallback {
   height: 100%;
@@ -141,6 +188,30 @@ onMounted(async () => {
   justify-content: center;
   font-size: 56px;
   color: var(--el-color-primary-light-5);
+}
+.dish-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dish-thumb {
+  width: 56px;
+  height: 56px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.dish-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.dish-thumb.active {
+  border-color: var(--el-color-primary);
 }
 .dish-info {
   flex: 1;
