@@ -2,6 +2,7 @@
 import json
 import math
 
+from app.categories import canonicalize
 from app.extensions import db
 from app.models import Favorite, Review, Shop
 from app.schemas.shop import ReviewSchema, ShopDetailSchema, ShopSchema
@@ -51,7 +52,7 @@ class ShopService:
         if keyword:
             query = query.filter(Shop.name.like(f'%{keyword}%'))
 
-        category = (params.get('category') or '').strip()
+        category = canonicalize(params.get('category'))
         if category:
             query = query.filter(Shop.category == category)
 

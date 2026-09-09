@@ -223,13 +223,10 @@ const loadUsers = async (p = pageUsers.value) => {
   loadingUsers.value = true
   try {
     const res = await getAdminUsers({ page: p, page_size: pageSize })
-    console.log('users API res:', res)
-    console.log('users res.data:', res.data)
     const d = res.data?.data || {}
     pageUsers.value = d.page || p
     totalUsers.value = d.total || 0
     users.value = d.items || []
-    console.log('users.value:', users.value)
   } catch (e) {
     console.error('users API error:', e)
   } finally {

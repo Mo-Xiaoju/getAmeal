@@ -66,11 +66,11 @@ class ShopDetailSchema(ShopSchema):
     latitude = fields.Float()
     created_at = fields.DateTime()
     owner_id = fields.Int()  # 店铺归属（前端据此判定是否展示管理按钮）
-    community_maintained = fields.Method('_community_maintained')  # 是否未被商户认领（学生可补充菜单）
+    community_maintained = fields.Method('_community_maintained')  # 是否尚未被商户入驻（仅用于文案区分，补充菜品已对全部公开店开放）
     favorited = fields.Method('_favorited')
 
     def _community_maintained(self, obj) -> bool:
-        """未被商户认领（owner 为空或 owner 非商户角色）的店，学生可补充菜品。"""
+        """是否尚未被商户入驻（owner 为空或 owner 非商户角色），用于前端展示提示文案。"""
         if obj.owner_id is None:
             return True
         owner = getattr(obj, 'owner', None)

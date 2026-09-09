@@ -14,7 +14,19 @@
               <div class="shop-line">
                 <span class="shop-name">{{ shop.name }}</span>
                 <el-tag v-if="shop.school_name" size="small" type="info" effect="plain">{{ shop.school_name }}</el-tag>
-                <el-tag v-if="shop.category" size="small" type="primary" effect="light">{{ shop.category }}</el-tag>
+                <!-- 分类下拉：可随时归类/纠正，改动即生效（无需重审） -->
+                <el-select
+                  :model-value="shop.category"
+                  size="small"
+                  clearable
+                  filterable
+                  placeholder="未分类"
+                  style="width: 120px"
+                  :loading="actingShop === shop.id"
+                  @change="(v) => handleReclassify(shop, v)"
+                >
+                  <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
+                </el-select>
                 <el-tag v-if="shop.price_range" size="small" type="warning" effect="plain">{{ shop.price_range }}</el-tag>
               </div>
               <div class="shop-addr">{{ shop.address }}</div>
@@ -115,10 +127,13 @@ import {
   bulkReviewShop,
   getAuditDishes,
   getAuditShops,
+  reclassifyShopCategory,
   reviewDish,
 } from '@/api/admin'
+import { useCategoryStore } from '@/store/category'
 
 const tab = ref('shops')
+const categoryStore = useCategoryStore()
 const pageSize = 10
 
 // ---- 店铺队列 ----
@@ -208,6 +223,21 @@ const bulkReject = async (shop) => {
     const affected = res.data.data?.affected_dishes || 0
     ElMessage.success(affected ? `已驳回店铺及 ${affected} 道待审菜品` : '已驳回店铺')
     loadShops()
+  } finally {
+    actingShop.value = null
+  }
+}
+
+// 管理员归类店铺分类（含清空），改动即落库，不影响审核状态
+const handleReclassify = async (shop, value) => {
+  const prev = shop.category
+  actingShop.value = shop.id
+  try {
+    await reclassifyShopCategory(shop.id, value || null)
+    shop.category = value || null
+    ElMessage.success(value ? `已归类为「${value}」` : '已清空分类')
+  } catch (e) {
+    shop.category = prev // 失败回退选中值
   } finally {
     actingShop.value = null
   }

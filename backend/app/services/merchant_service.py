@@ -1,6 +1,9 @@
 """商户中心业务逻辑：商户管理自己的店铺与菜单（仅限本人的店铺/菜品）。"""
+from sqlalchemy import and_, or_
+
+from app.categories import normalize_category_payload
 from app.extensions import db
-from app.models import Dish, Shop
+from app.models import Dish, Shop, User
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
 from app.schemas.shop import ShopCreateSchema, ShopSchema, ShopUpdateSchema
 from app.utils.exceptions import ApiError, NotFoundError, PermissionError, ValidationError
@@ -73,9 +76,63 @@ class MerchantService:
         return {**result, 'items': items}
 
     @staticmethod
+    def list_claimable(user, params: dict) -> dict:
+        """列出当前商户可认领的店铺：已公开（approved、未下架）且尚未被商户认领。
+
+        认领范围：owner 为空（管理员种子店）或 owner 非商户角色（学生代提交）的店铺；
+        本人名下的店铺天然不在列。可用 school_id 限定当前学校。
+        """
+        query = (
+            Shop.query.outerjoin(User, User.id == Shop.owner_id)
+            .filter(
+                Shop.is_active.is_(True),
+                Shop.status == 'approved',
+                # owner 为空（管理员种子店）可认领；owner 非本人且非商户角色的社区店可认领。
+                # 注意 SQL 中 owner_id != user 对 NULL 不成立，须显式放行 owner_id IS NULL。
+                or_(
+                    Shop.owner_id.is_(None),
+                    and_(Shop.owner_id != user.id, User.role != 'merchant'),
+                ),
+            )
+            .order_by(Shop.id.desc())
+        )
+        school_id = params.get('school_id')
+        if school_id:
+            try:
+                query = query.filter(Shop.school_id == int(school_id))
+            except (TypeError, ValueError):
+                pass  # 非法 school_id 视为不限定
+        page = int(params.get('page') or 1)
+        page_size = int(params.get('page_size') or 10)
+        result = paginate(query, page, page_size)
+        items = [_serialize_shop(s, with_dish_count=True) for s in result['items']]
+        return {**result, 'items': items}
+
+    @staticmethod
+    def claim_shop(user, shop_id: int) -> dict:
+        """认领一家未入驻店铺到自己名下，认领后可在商户中心管理其菜单。
+
+        仅限已公开（approved）且未被商户认领的店；认领即刻生效（店铺本就对公开放映）。
+        """
+        shop = db.session.get(Shop, shop_id)
+        if shop is None or not shop.is_active:
+            raise NotFoundError(message='店铺不存在', code=4040)
+        if shop.status != 'approved':
+            raise ValidationError(message='仅可认领已公开（审核通过）的店铺', code=4000)
+        if shop.owner_id == user.id:
+            raise ValidationError(message='该店铺已是你的店铺，无需认领', code=4000)
+        owner = shop.owner
+        if owner is not None and owner.role == 'merchant':
+            raise ValidationError(message='该店铺已有商户入驻，无需认领', code=4000)
+        shop.owner_id = user.id
+        db.session.commit()
+        return _serialize_shop(shop, with_dish_count=True)
+
+    @staticmethod
     def create_shop(user, data: dict) -> dict:
         """新增店铺（商户创建即 approved，无需审核）。"""
         data = ShopCreateSchema().load(data)
+        data = normalize_category_payload(data)
         _validate_unique_shop_name(data['name'])
         shop = Shop(**data, owner_id=user.id, status='approved')
         db.session.add(shop)
@@ -91,6 +148,7 @@ class MerchantService:
         """修改自己的店铺信息（商户本人维护的内容直接发布，无需再审核）。"""
         shop = _get_owned_shop(user, shop_id)
         data = ShopUpdateSchema().load(data)
+        data = normalize_category_payload(data)
         for key, value in data.items():
             if value is not None:
                 setattr(shop, key, value)

@@ -5,7 +5,18 @@
         <h1 class="page-title">商户中心</h1>
         <p class="page-desc">发布和管理你的食堂与菜单（仅可操作自己的店铺）</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="openShopDialog()">新建店铺</el-button>
+      <div class="page-actions">
+        <el-button
+          :icon="Link"
+          plain
+          :disabled="!schoolStore.hasSchool"
+          :title="schoolStore.hasSchool ? '认领校园内已公开但尚未入驻的店铺' : '请先选择所在学校'"
+          @click="openClaimDialog"
+        >
+          认领已有店铺
+        </el-button>
+        <el-button type="primary" :icon="Plus" @click="openShopDialog()">新建店铺</el-button>
+      </div>
     </div>
 
     <div v-if="!schoolStore.hasSchool" class="no-school">
@@ -57,7 +68,9 @@
           <el-input v-model="shopDialog.form.address" maxlength="200" placeholder="例如：校园内学三食堂一楼" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-input v-model="shopDialog.form.category" placeholder="例如：食堂 / 奶茶饮品 / 面食" />
+          <el-select v-model="shopDialog.form.category" placeholder="请选择分类" clearable style="width: 100%">
+            <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
+          </el-select>
         </el-form-item>
         <el-form-item label="人均区间">
           <el-input v-model="shopDialog.form.price_range" placeholder="例如：10-20元" />
@@ -126,6 +139,41 @@
         <el-empty v-if="!dishLoading && !dishes.length" description="暂无菜品，先添加一道吧" />
       </div>
     </el-drawer>
+
+    <!-- 认领已有店铺 -->
+    <el-dialog v-model="claimDialog.show" title="认领已有店铺" width="680px">
+      <p class="claim-tip">
+        选择一家当前学校内「已公开且尚未有商户入驻」的店铺挂到你名下；认领后即可在商户中心直接管理其菜单。
+        同学仍可向该店补充菜品，但会进入审核，管理员通过后才会对外展示。
+      </p>
+      <div v-loading="claimLoading" class="claim-list">
+        <div v-for="shop in claimableShops" :key="shop.id" class="claim-item">
+          <div class="claim-info">
+            <img v-if="shop.image_url" :src="shop.image_url" class="claim-cover" alt="" />
+            <div v-else class="claim-cover placeholder"><el-icon><Shop /></el-icon></div>
+            <div class="claim-text">
+              <div class="claim-name">{{ shop.name }}</div>
+              <div class="claim-meta">
+                <span v-if="shop.category">{{ shop.category }}</span>
+                <span v-if="shop.price_range">{{ shop.price_range }}</span>
+                <span>{{ shop.address }}</span>
+                <span>{{ shop.dish_count }} 道菜</span>
+              </div>
+            </div>
+          </div>
+          <el-button
+            type="primary"
+            plain
+            size="small"
+            :loading="claimingId === shop.id"
+            @click="handleClaim(shop)"
+          >
+            认领
+          </el-button>
+        </div>
+        <el-empty v-if="!claimLoading && !claimableShops.length" description="当前学校暂无待认领店铺" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -133,23 +181,27 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Shop } from '@element-plus/icons-vue'
+import { Link, Plus, Shop } from '@element-plus/icons-vue'
 
 import {
+  claimShop,
   createDish,
   createShop,
   deleteDish,
   deleteShop,
+  getClaimableShops,
   getMyShops,
   getShopDishes,
   updateDish,
   updateShop,
 } from '@/api/merchant'
 import ImageField from '@/components/ImageField.vue'
+import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 
 const router = useRouter()
 const schoolStore = useSchoolStore()
+const categoryStore = useCategoryStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -178,8 +230,8 @@ const statusText = (s) => ({ approved: '已发布', pending: '待审核', reject
 const loadShops = async () => {
   loading.value = true
   try {
-    const data = await getMyShops({ page: 1, page_size: 50 })
-    shops.value = data.data.items || []
+    const res = await getMyShops({ page: 1, page_size: 50 })
+    shops.value = res.data.data.items || []
   } finally {
     loading.value = false
   }
@@ -227,6 +279,38 @@ const handleDeleteShop = async (shop) => {
   loadShops()
 }
 
+// ---- 认领已有店铺 ----
+const claimDialog = reactive({ show: false })
+const claimLoading = ref(false)
+const claimableShops = ref([])
+const claimingId = ref(null)
+
+const openClaimDialog = async () => {
+  claimDialog.show = true
+  claimLoading.value = true
+  try {
+    const params = schoolStore.hasSchool
+      ? { school_id: schoolStore.currentSchool.id, page_size: 50 }
+      : { page_size: 50 }
+    const res = await getClaimableShops(params)
+    claimableShops.value = res.data.data.items || []
+  } finally {
+    claimLoading.value = false
+  }
+}
+
+const handleClaim = async (shop) => {
+  claimingId.value = shop.id
+  try {
+    await claimShop(shop.id)
+    ElMessage.success(`已认领「${shop.name}」`)
+    claimableShops.value = claimableShops.value.filter((s) => s.id !== shop.id)
+    loadShops()
+  } finally {
+    claimingId.value = null
+  }
+}
+
 // ---- 菜单管理 ----
 const dishDrawer = reactive({ show: false, shop: null })
 const dishLoading = ref(false)
@@ -252,8 +336,8 @@ const resetDishForm = () => {
 const loadDishes = async (shopId) => {
   dishLoading.value = true
   try {
-    const data = await getShopDishes(shopId, { page: 1, page_size: 50 })
-    dishes.value = data.data.items || []
+    const res = await getShopDishes(shopId, { page: 1, page_size: 50 })
+    dishes.value = res.data.data.items || []
   } finally {
     dishLoading.value = false
   }
@@ -310,6 +394,7 @@ const handleDeleteDish = async (dish) => {
 
 onMounted(() => {
   if (!schoolStore.schoolList.length) schoolStore.fetchSchools()
+  if (!categoryStore.categories.length) categoryStore.fetchCategories()
   loadShops()
 })
 </script>
@@ -325,6 +410,11 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .page-title {
   margin: 0 0 6px;
@@ -466,5 +556,66 @@ onMounted(() => {
 .dish-ops {
   display: flex;
   flex-shrink: 0;
+}
+.claim-tip {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.7;
+}
+.claim-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 80px;
+}
+.claim-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+}
+.claim-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.claim-cover {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f2f3f5;
+}
+.claim-cover.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-color-primary);
+  font-size: 20px;
+}
+.claim-text {
+  min-width: 0;
+}
+.claim-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.claim-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #909399;
 }
 </style>

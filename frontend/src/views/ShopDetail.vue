@@ -36,7 +36,7 @@
                 {{ shopStore.isFavorited ? '已收藏' : '收藏店铺' }}
               </el-button>
               <el-button type="success" plain :icon="EditPen" @click="scrollToReview">写评价</el-button>
-              <!-- 未入驻/社区店：同学可补充菜品（走审核） -->
+              <!-- 菜单可能更新不及时：同学可代为补充菜品（走审核，同店同名去重） -->
               <el-button v-if="canContribute" plain :icon="Plus" @click="openDishDialog">补充菜品</el-button>
             </template>
             <!-- 仅本商户的店铺出现管理入口；非本商户的店铺不渲染任何管理按钮 -->
@@ -56,8 +56,12 @@
       </div>
       <el-empty
         v-if="!dishStore.loading && !dishStore.shopDishes.length"
-        description="本店暂无在售菜品"
-      />
+        :description="emptyDishesText"
+      >
+        <el-button v-if="canContribute" size="small" type="primary" plain :icon="Plus" @click="openDishDialog">
+          补充菜品
+        </el-button>
+      </el-empty>
     </section>
 
     <!-- 评价区 -->
@@ -113,9 +117,9 @@
       />
     </div>
 
-    <!-- 补充菜品（提交给未入驻/社区店，审核后展示） -->
+    <!-- 补充菜品（代已公开店铺补全菜单，审核后展示） -->
     <el-dialog v-model="dishDialog.show" title="补充菜品" width="480px">
-      <p class="dish-tip">该店尚未有商户入驻，你补充的菜品将进入审核，通过后对外展示。</p>
+      <p class="dish-tip">{{ dishDialogTip }}</p>
       <el-form label-position="top">
         <div class="dish-form-row">
           <el-form-item label="菜品名" required>
@@ -179,12 +183,19 @@ const shop = computed(() => shopStore.shopDetail || {})
 const isMyShop = computed(
   () => userStore.isMerchant && shop.value.owner_id === userStore.userInfo?.id,
 )
-// 是否可向该店补充菜品：非商户 + 社区维护店（未被商户认领）+ 非自己提交的店
+// 是否可向该店补充菜品：任何非商户用户都可代为补全已公开店铺的菜单（商家可能更新不及时，
+// 提交仍走审核）；仅排除商户视角与自己提交的店铺（后者在「提交管理」页维护）。
 const canContribute = computed(
-  () =>
-    !userStore.isMerchant &&
-    shop.value.community_maintained === true &&
-    shop.value.owner_id !== userStore.userInfo?.id,
+  () => !userStore.isMerchant && shop.value.owner_id !== userStore.userInfo?.id,
+)
+// 弹窗/空态文案：社区店（尚无商户入驻）与商户入驻店分开表述
+const dishDialogTip = computed(() =>
+  shop.value.community_maintained
+    ? '该店尚未有商户入驻，你补充的菜品将进入审核，通过后对外展示。'
+    : '如果店铺菜单更新不及时或漏了菜，你可以帮忙补充；提交后进入审核，通过前不对外展示。',
+)
+const emptyDishesText = computed(() =>
+  canContribute.value ? '本店暂未收录在售菜品，你可以帮店家补充' : '本店暂无在售菜品',
 )
 
 // ---- 补充菜品 ----

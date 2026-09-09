@@ -14,6 +14,8 @@ import json
 import os
 from datetime import datetime, timedelta
 
+import click
+
 from app.extensions import db
 from app.models import (
     Circle,
@@ -655,3 +657,55 @@ def register_cli(app) -> None:
             f'启用店铺 {active_shops} 家、菜品 {dish_count} 道、笔记 {len(posts)} 篇。'
         )
         print('用法：进入首页选「虚拟演示大学」，用 rec_spicy / rec_milk / rec_cold 登录对比三轨推荐差异。')
+
+    @app.cli.command('normalize-categories')
+    @click.option('--dry-run', is_flag=True, help='只打印回填计划与残留清单，不写库。')
+    def normalize_categories(dry_run):
+        """店铺分类回填 + 熵审计：把别名类刷成规范值，并报告归不进词表的残留店（幂等）。
+
+        词表/别名见 app.categories；残留店（如历史垃圾值）不会被自动改写，打印后
+        用管理员归类接口 `PUT /api/admin/shops/<id>/category` 人工处置。
+        """
+        from sqlalchemy import func
+
+        from app.categories import CATEGORY_SET, canonicalize
+
+        counts = db.session.query(Shop.category, func.count(Shop.id)).group_by(Shop.category).all()
+        print('—— 当前 category 分布 ——')
+        for cat, n in sorted(counts, key=lambda t: (t[0] is None, str(t[0]) or '')):
+            print(f'  {str(cat):<10} ×{n}')
+
+        plan = []      # (旧值, 规范值, 家数)
+        leftovers = []  # (id, name, 旧分类)：归不进词表，待管理员人工归类
+        for cat, n in counts:
+            if cat is None or not str(cat).strip():
+                continue
+            canon = canonicalize(cat)
+            if canon not in CATEGORY_SET:
+                for shop in Shop.query.filter(Shop.category == cat).order_by(Shop.id.asc()).all():
+                    leftovers.append((shop.id, shop.name, shop.category))
+            elif canon != cat:
+                plan.append((cat, canon, n))
+
+        print('\n—— 回填计划（别名 → 规范值）——')
+        if plan:
+            for old, new, n in plan:
+                print(f'  {old} → {new}　×{n} 家')
+        else:
+            print('  无需回填（已全部规范）')
+
+        if leftovers:
+            print('\n—— 归不进词表的残留店（需管理员归类，可用 reclassify 接口或直接改库）——')
+            for sid, name, old in leftovers:
+                print(f'  id={sid}　「{name}」　旧分类={old}')
+
+        if dry_run:
+            print('\n[dry-run] 未写库。')
+            return
+
+        if plan:
+            for old, new, _ in plan:
+                Shop.query.filter(Shop.category == old).update({Shop.category: new})
+            db.session.commit()
+            print(f'\n已回填 {sum(n for _, _, n in plan)} 家（{len(plan)} 类别名）。')
+        print(f'当前非规范残留 {len(leftovers)} 家。')

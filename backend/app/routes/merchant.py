@@ -15,6 +15,20 @@ def list_my_shops():
     return ok(MerchantService.list_my_shops(g.current_user, request.args.to_dict()))
 
 
+@bp_merchant.route('/shops/claimable', methods=['GET'])
+@require_merchant
+def list_claimable_shops():
+    """可认领的店铺（已公开且未被商户认领，可按 school_id 限定）。"""
+    return ok(MerchantService.list_claimable(g.current_user, request.args.to_dict()))
+
+
+@bp_merchant.route('/shops/<int:shop_id>/claim', methods=['POST'])
+@require_merchant
+def claim_shop(shop_id):
+    """认领一家未入驻店铺到自己名下。"""
+    return ok(MerchantService.claim_shop(g.current_user, shop_id), message='认领成功')
+
+
 @bp_merchant.route('/shops', methods=['POST'])
 @require_merchant
 def create_shop():

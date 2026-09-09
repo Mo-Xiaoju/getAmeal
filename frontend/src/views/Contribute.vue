@@ -96,7 +96,9 @@
           <el-input v-model="shopDialog.form.address" maxlength="200" placeholder="例如：校园内学三食堂一楼" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-input v-model="shopDialog.form.category" placeholder="例如：食堂 / 奶茶饮品 / 面食" />
+          <el-select v-model="shopDialog.form.category" placeholder="请选择分类" clearable style="width: 100%">
+            <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
+          </el-select>
         </el-form-item>
         <el-form-item label="人均区间">
           <el-input v-model="shopDialog.form.price_range" placeholder="例如：10-20元" />
@@ -228,10 +230,12 @@ import {
   updateSubmittedShop,
 } from '@/api/contribute'
 import ImageField from '@/components/ImageField.vue'
+import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 
 const router = useRouter()
 const schoolStore = useSchoolStore()
+const categoryStore = useCategoryStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -457,6 +461,7 @@ const handleDeleteContributed = async (dish) => {
 
 onMounted(() => {
   if (!schoolStore.schoolList.length) schoolStore.fetchSchools()
+  if (!categoryStore.categories.length) categoryStore.fetchCategories()
   loadMy()
 })
 </script>

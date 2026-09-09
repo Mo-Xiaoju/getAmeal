@@ -20,6 +20,8 @@ export const getAuditDishes = (params) => request.get('/admin/audits/dishes', { 
 export const reviewShop = (shopId, data) => request.post(`/admin/audits/shops/${shopId}/review`, data)
 // 整店审核：店铺与其全部待审菜品一并通过/驳回
 export const bulkReviewShop = (shopId, data) => request.post(`/admin/audits/shops/${shopId}/bulk`, data)
+// 归类店铺分类（受控词表），data: { category }，传 null 清空分类
+export const reclassifyShopCategory = (shopId, category) => request.put(`/admin/shops/${shopId}/category`, { category })
 // 审核单道菜品，data: { action, reason? }
 export const reviewDish = (dishId, data) => request.post(`/admin/audits/dishes/${dishId}/review`, data)
 

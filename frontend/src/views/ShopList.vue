@@ -23,7 +23,7 @@
         @clear="handleSearch"
       />
       <el-select v-model="filters.category" placeholder="全部分类" clearable style="width: 140px" @change="handleSearch">
-        <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+        <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
       </el-select>
       <el-select v-model="filters.sort" placeholder="排序" style="width: 130px" @change="handleSearch">
         <el-option label="评分最高" value="rating" />
@@ -55,14 +55,14 @@ import { School, Search } from '@element-plus/icons-vue'
 
 import Pagination from '@/components/Pagination.vue'
 import ShopCard from '@/components/ShopCard.vue'
+import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 import { useShopStore } from '@/store/shop'
 
 const router = useRouter()
 const schoolStore = useSchoolStore()
 const shopStore = useShopStore()
-
-const categories = ['食堂', '小吃', '面食', '火锅', '烧烤', '奶茶饮品', '咖啡甜点', '烘焙甜点', '甜品', '茶餐厅', '美食广场']
+const categoryStore = useCategoryStore()
 
 const filters = reactive({
   keyword: '',
@@ -97,6 +97,7 @@ onMounted(async () => {
   if (!schoolStore.schoolList.length) {
     await schoolStore.fetchSchools()
   }
+  if (!categoryStore.categories.length) categoryStore.fetchCategories()
   loadShops()
 })
 </script>
