@@ -25,3 +25,9 @@ export const reclassifyShopCategory = (shopId, category) => request.put(`/admin/
 // 审核单道菜品，data: { action, reason? }
 export const reviewDish = (dishId, data) => request.post(`/admin/audits/dishes/${dishId}/review`, data)
 
+// ---- 数据统计（埋点看板）----
+// 统计聚合：params { days? }，返回 summary/trend/by_type/by_school
+export const getAdminStats = (params) => request.get('/admin/stats', { params })
+// 事件明细列表：params { page, page_size, event_type? }
+export const getAdminEvents = (params) => request.get('/admin/events', { params })
+

@@ -108,6 +108,16 @@ def admin_review_dish(dish_id):
 
 
 @bp_admin.route('/stats', methods=['GET'])
+@require_admin
 def admin_get_stats():
-    """数据统计。"""
-    return ok()  # TODO: AdminService.get_stats()
+    """数据统计看板聚合。"""
+    params = request.args.to_dict()
+    return ok(AdminService.get_stats(params))
+
+
+@bp_admin.route('/events', methods=['GET'])
+@require_admin
+def admin_get_events():
+    """事件明细列表（分页）。"""
+    params = request.args.to_dict()
+    return ok(AdminService.list_events(params))

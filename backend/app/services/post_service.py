@@ -12,6 +12,7 @@ from app.schemas.post import (
     PostSchema,
 )
 from app.services.recommend_service import RecommendService
+from app.services.event_log_service import EventLogService
 from app.utils.exceptions import NotFoundError, PermissionError, ValidationError
 from app.utils.pagination import paginate
 
@@ -53,7 +54,7 @@ class PostService:
 
         # 必填关联店铺：笔记必须绑定一个现存在售店铺
         shop_id = int(data['shop_id'])
-        _get_active_shop(shop_id)
+        shop = _get_active_shop(shop_id)
 
         post = Post(
             user_id=user.id,
@@ -64,6 +65,10 @@ class PostService:
             tags=(data.get('tags') or '').strip()[:200] or None,
         )
         db.session.add(post)
+        db.session.flush()  # 拿到 post.id 供埋点
+        EventLogService.record(user, 'post_create', target_type='post', target_id=post.id,
+                               school_id=shop.school_id,
+                               extra={'title': title[:100], 'shop_name': shop.name})
         db.session.commit()
         return _post_detail_schema.dump(post)
 
