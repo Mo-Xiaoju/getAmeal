@@ -92,6 +92,14 @@ const routes = [
     meta: { title: '浏览记录', requiresAuth: true },
   },
   {
+    // 他人公开主页：不加 requiresAuth，游客也能从笔记/评论头像点进来看
+    // 用 \d+ 约束，避免 /user/abc 匹配后打到不存在的接口上
+    path: '/user/:id(\\d+)',
+    name: 'user-profile',
+    component: () => import('../views/UserProfile.vue'),
+    meta: { title: '用户主页' },
+  },
+  {
     path: '/merchant',
     name: 'merchant',
     component: () => import('../views/Merchant.vue'),
@@ -156,6 +164,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  // 切换页面回到顶部；浏览器前进/后退时恢复原滚动位置
+  // （默认行为会保留上一个页面的滚动位置，切到短页面时观感很跳）
+  scrollBehavior(to, from, savedPosition) {
+    return savedPosition || { top: 0 }
+  },
 })
 
 // 全局路由守卫

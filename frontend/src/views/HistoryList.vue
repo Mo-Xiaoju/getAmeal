@@ -113,17 +113,25 @@ onMounted(() => loadPage(1))
 .type-tabs {
   margin-bottom: 20px;
 }
+/* 不设 align-items: start —— 默认 stretch，同一行的店铺/菜品/笔记卡片才是等高 */
 .hist-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 18px;
-  align-items: start;
   min-height: 120px;
 }
 .hist-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  height: 100%;
+}
+/* 卡片撑满格子的剩余高度（三种卡片根节点都带同名骨架样式） */
+.hist-item :deep(.shop-card),
+.hist-item :deep(.dish-card),
+.hist-item :deep(.post-card) {
+  flex: 1;
+  min-height: 0;
 }
 .hist-meta {
   display: flex;

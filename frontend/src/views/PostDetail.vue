@@ -7,11 +7,18 @@
     <div v-if="postStore.postDetail" class="post-main">
       <!-- 作者行 -->
       <div class="author-row">
-        <el-avatar :size="44" :src="post.author?.avatar_url || undefined">
+        <el-avatar
+          class="user-link"
+          :size="44"
+          :src="post.author?.avatar_url || undefined"
+          @click="goUser(post.user_id)"
+        >
           {{ (post.author?.nickname || 'U').charAt(0) }}
         </el-avatar>
         <div class="author-info">
-          <span class="author-name">{{ post.author?.nickname || '匿名用户' }}</span>
+          <span class="author-name user-link" @click="goUser(post.user_id)">
+            {{ post.author?.nickname || '匿名用户' }}
+          </span>
           <span class="post-time">{{ formatDate(post.created_at) }}</span>
         </div>
         <el-button
@@ -100,7 +107,12 @@
         <div v-loading="commentsLoading" class="comment-list">
           <el-empty v-if="!commentsLoading && !postStore.comments.length" description="暂无评论，抢个沙发" />
           <div v-for="c in postStore.comments" :key="c.id" class="comment-item">
-            <el-avatar :size="34" :src="c.avatar_url || undefined">
+            <el-avatar
+              class="user-link"
+              :size="34"
+              :src="c.avatar_url || undefined"
+              @click="goUser(c.user_id)"
+            >
               {{ (c.nickname || 'U').charAt(0) }}
             </el-avatar>
             <div class="comment-body">
@@ -124,6 +136,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Shop, Star, StarFilled } from '@element-plus/icons-vue'
 
 import { openImage } from '@/composables/useImageViewer'
+import { useUserNav } from '@/composables/useUserNav'
 import { usePostStore } from '@/store/post'
 import { useUserStore } from '@/store/user'
 
@@ -131,6 +144,7 @@ const route = useRoute()
 const router = useRouter()
 const postStore = usePostStore()
 const userStore = useUserStore()
+const { goUser } = useUserNav()
 
 const postId = computed(() => Number(route.params.id))
 const post = computed(() => postStore.postDetail || {})
@@ -256,6 +270,17 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
+}
+/* 头像 / 昵称可点进对方主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
+}
+.author-name.user-link:hover {
+  color: var(--el-color-primary);
 }
 .post-time {
   font-size: 12px;

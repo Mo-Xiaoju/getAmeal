@@ -4,7 +4,7 @@ from flask import Blueprint, g, request
 from app.services.activity_service import ActivityService
 from app.services.shop_service import ShopService
 from app.services.user_service import UserService
-from app.utils.decorators import require_consumer, require_login
+from app.utils.decorators import optional_login, require_consumer, require_login
 from app.utils.responses import ok
 
 bp_user = Blueprint('user', __name__)
@@ -48,6 +48,13 @@ def get_followers():
     """关注当前用户的人（分页）。"""
     params = request.args.to_dict()
     return ok(UserService.list_followers(g.current_user, params))
+
+
+@bp_user.route('/<int:user_id>/profile', methods=['GET'])
+@optional_login
+def get_user_profile(user_id):
+    """他人公开主页资料（游客可见；带登录态时回显 is_following）。"""
+    return ok(UserService.get_public_profile(user_id, g.current_user))
 
 
 @bp_user.route('/<int:user_id>/follow', methods=['POST'])

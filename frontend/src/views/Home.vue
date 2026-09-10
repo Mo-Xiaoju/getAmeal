@@ -1,39 +1,76 @@
 <template>
   <div class="home">
-    <section class="hero">
-      <h1 class="hero-title">校园美食，从这里开始</h1>
-      <p class="hero-desc">
-        发现食堂与周边美食 · 真实评价 · 探店笔记 · 美食圈子
-      </p>
+    <!-- 滚动 Banner：首屏为欢迎语与入口，其余屏为功能介绍面板 -->
+    <section class="hero-banner" @mouseenter="pauseAutoPlay" @mouseleave="resumeAutoPlay">
+      <el-carousel
+        ref="carouselRef"
+        height="340px"
+        :autoplay="false"
+        indicator-position="none"
+        arrow="hover"
+        @change="onSlideChange"
+      >
+        <el-carousel-item>
+          <div class="slide">
+            <h1 class="hero-title">校园美食，从这里开始</h1>
+            <p class="hero-desc">
+              发现食堂与周边美食 · 真实评价 · 探店笔记 · 美食圈子
+            </p>
 
-      <!-- 学校上下文 -->
-      <div class="school-context">
-        <template v-if="schoolStore.hasSchool">
-          <el-icon class="school-icon"><School /></el-icon>
-          <span class="school-name">{{ schoolStore.currentSchool.name }}</span>
-          <el-button size="small" text type="primary" @click="router.push('/choose-school')">切换学校</el-button>
-        </template>
-        <template v-else>
-          <span class="school-tip">选择你的学校，浏览专属美食</span>
-          <el-button type="primary" size="large" @click="router.push('/choose-school')">选择学校</el-button>
-        </template>
-      </div>
+            <!-- 学校上下文 -->
+            <div class="school-context">
+              <template v-if="schoolStore.hasSchool">
+                <el-icon class="school-icon"><School /></el-icon>
+                <span class="school-name">{{ schoolStore.currentSchool.name }}</span>
+              </template>
+              <template v-else>
+                <span class="school-tip">选择你的学校，浏览专属美食</span>
+                <el-button type="primary" size="large" @click="router.push('/choose-school')">选择学校</el-button>
+              </template>
+            </div>
 
-      <div class="hero-actions">
-        <template v-if="userStore.isMerchant">
-          <el-button type="primary" size="large" :icon="Plus" @click="router.push('/merchant')">
-            发布店铺 / 管理菜单
-          </el-button>
-          <el-button size="large" @click="router.push('/shops')">逛一逛店铺</el-button>
-        </template>
-        <template v-else-if="userStore.isLoggedIn">
-          <el-button type="primary" size="large" @click="router.push('/shops')">逛一逛店铺</el-button>
-          <el-button size="large" @click="router.push('/profile')">进入个人中心</el-button>
-        </template>
-        <template v-else>
-          <el-button type="primary" size="large" @click="router.push('/register')">立即注册</el-button>
-          <el-button size="large" @click="router.push('/login')">登录</el-button>
-        </template>
+            <div v-if="userStore.isMerchant || !userStore.isLoggedIn" class="hero-actions">
+              <el-button
+                v-if="userStore.isMerchant"
+                type="primary"
+                size="large"
+                :icon="Plus"
+                @click="router.push('/merchant')"
+              >
+                发布店铺 / 管理菜单
+              </el-button>
+              <template v-else>
+                <el-button type="primary" size="large" @click="router.push('/register')">立即注册</el-button>
+                <el-button size="large" @click="router.push('/login')">登录</el-button>
+              </template>
+            </div>
+          </div>
+        </el-carousel-item>
+
+        <el-carousel-item v-for="feature in features" :key="feature.title">
+          <div class="slide slide-feature">
+            <div class="feature-icon" :style="{ color: feature.color }">
+              <el-icon><component :is="feature.icon" /></el-icon>
+            </div>
+            <h3 class="feature-title">{{ feature.title }}</h3>
+            <p class="feature-desc">{{ feature.desc }}</p>
+          </div>
+        </el-carousel-item>
+      </el-carousel>
+
+      <!-- 进度式指示条：当前段的填充条即"距离自动翻页还剩多久"，鼠标悬停 banner 会暂停 -->
+      <div ref="indicatorsRef" class="banner-indicators">
+        <button
+          v-for="(label, index) in slideLabels"
+          :key="label"
+          type="button"
+          class="indicator"
+          :class="{ active: index === activeIndex }"
+          :aria-label="`切换到：${label}`"
+          @click="goTo(index)"
+        >
+          <span v-if="index === activeIndex" class="indicator-fill" />
+        </button>
       </div>
     </section>
 
@@ -96,29 +133,11 @@
         description="还没有探店笔记"
       />
     </section>
-
-    <section class="features">
-      <div class="feature-card">
-        <el-icon class="feature-icon"><Shop /></el-icon>
-        <h3>发现美食</h3>
-        <p>按学校浏览食堂窗口与周边店铺，查看菜品与真实评分。</p>
-      </div>
-      <div class="feature-card">
-        <el-icon class="feature-icon"><EditPen /></el-icon>
-        <h3>分享探店</h3>
-        <p>发布探店笔记，配图配文，安利你心中的校园好味道。</p>
-      </div>
-      <div class="feature-card">
-        <el-icon class="feature-icon"><ChatDotRound /></el-icon>
-        <h3>互动交流</h3>
-        <p>点赞收藏、评论互动、关注博主、加入美食圈子。</p>
-      </div>
-    </section>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChatDotRound, EditPen, Plus, School, Shop } from '@element-plus/icons-vue'
 
@@ -138,7 +157,121 @@ const dishStore = useDishStore()
 const postStore = usePostStore()
 const userStore = useUserStore()
 
+// Banner 中滚动展示的三张功能面板
+const features = [
+  {
+    icon: Shop,
+    title: '发现美食',
+    desc: '按学校浏览食堂窗口与周边店铺，查看菜品与真实评分。',
+    color: 'var(--el-color-primary)',
+  },
+  {
+    icon: EditPen,
+    title: '分享探店',
+    desc: '发布探店笔记，配图配文，安利你心中的校园好味道。',
+    color: 'var(--el-color-success)',
+  },
+  {
+    icon: ChatDotRound,
+    title: '互动交流',
+    desc: '点赞收藏、评论互动、关注博主、加入美食圈子。',
+    color: 'var(--el-color-warning)',
+  },
+]
+
+/* ---------- Banner 自动翻页 + 进度预览 ---------- */
+// 自动翻页间隔：下方的进度条按同一时长填充，翻页前即可预估剩余时间
+const AUTO_PLAY_MS = 5000
+
+const carouselRef = ref(null)
+const indicatorsRef = ref(null)
+const activeIndex = ref(0)
+const paused = ref(false)
+
+const slideLabels = computed(() => ['校园美食，从这里开始', ...features.map((f) => f.title)])
+const slideCount = slideLabels.value.length
+
+// 进度条宽度与翻页时刻由同一条时钟驱动：每帧读同一个"已播放时长"，
+// 既判断该不该翻页，也决定填充宽度，两者不可能对不上，
+// 也就不会出现"进度条走完还要干等一会儿才翻页"的空档。
+// 时长按真实时间戳推算而非逐帧累加，主线程卡顿不会把这 5 秒拖长
+let cycleStart = 0
+let pausedAt = 0
+let pausedTotal = 0
+let rafId = null
+let fillEl = null
+let paintedWidth = -1
+
+function elapsedMs() {
+  const end = paused.value ? pausedAt : performance.now()
+  return Math.max(0, end - cycleStart - pausedTotal)
+}
+
+function paint() {
+  if (!fillEl || !fillEl.isConnected) {
+    // 当前段的填充条元素随 activeIndex 变化被重建，缓存失效后重新取
+    fillEl = indicatorsRef.value?.querySelector('.indicator-fill') ?? null
+    paintedWidth = -1
+  }
+  if (!fillEl) return
+  const width = Math.min(elapsedMs() / AUTO_PLAY_MS, 1) * 100
+  if (width === paintedWidth) return
+  paintedWidth = width
+  fillEl.style.width = `${width}%`
+}
+
+// 重新开始计时：切屏后调用
+function resetProgress() {
+  cycleStart = performance.now()
+  pausedTotal = 0
+  if (paused.value) pausedAt = cycleStart
+  // 立刻清空旧段，避免 Vue 换到新段之前残留满格
+  if (fillEl) fillEl.style.width = '0%'
+  fillEl = null
+  paintedWidth = -1
+}
+
+function frame() {
+  if (!paused.value && elapsedMs() >= AUTO_PLAY_MS) {
+    goTo(activeIndex.value + 1)
+  }
+  paint()
+  rafId = requestAnimationFrame(frame)
+}
+
+// 唯一的切屏入口：自己先把状态改掉，不依赖 change 事件回来补
+function goTo(index) {
+  const next = (index + slideCount) % slideCount
+  activeIndex.value = next
+  resetProgress()
+  // 手动翻页视为"继续播放"：否则悬停中点击会停在 0%，看上去像进度条消失了
+  paused.value = false
+  carouselRef.value?.setActiveItem(next)
+}
+
+// 兜住箭头等轮播自身发起的切换（自己发起的在 goTo 里已经处理过）
+function onSlideChange(index) {
+  if (index === activeIndex.value) return
+  activeIndex.value = index
+  resetProgress()
+  paused.value = false
+}
+
+// 悬停暂停：时钟与进度条同时冻结，移开后从原处继续
+function pauseAutoPlay() {
+  if (paused.value) return
+  pausedAt = performance.now()
+  paused.value = true
+}
+
+function resumeAutoPlay() {
+  if (!paused.value) return
+  pausedTotal += performance.now() - pausedAt
+  paused.value = false
+}
+
 onMounted(async () => {
+  rafId = requestAnimationFrame(frame)
   if (!schoolStore.schoolList.length) {
     await schoolStore.fetchSchools()
   }
@@ -148,6 +281,8 @@ onMounted(async () => {
     postStore.fetchList({ school_id: schoolStore.currentSchool.id, page_size: 3, sort: 'recommend' })
   }
 })
+
+onUnmounted(() => cancelAnimationFrame(rafId))
 </script>
 
 <style scoped>
@@ -156,20 +291,58 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 40px 20px;
 }
-.hero {
-  text-align: center;
-  padding: 60px 20px 40px;
+.hero-banner {
+  padding: 8px 0 0;
   background: linear-gradient(135deg, var(--el-color-primary-light-9), #ecf5ff);
   border-radius: 16px;
+  overflow: hidden;
+}
+.slide {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  text-align: center;
+  box-sizing: border-box;
+}
+/* 功能面板：铺满整屏，与 banner 背景融为一体（不做成悬浮卡片） */
+.slide-feature {
+  padding: 0 40px;
+}
+.feature-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.12);
+  font-size: 32px;
+}
+.feature-title {
+  margin: 0 0 10px;
+  font-size: 24px;
+  color: #303133;
+}
+.feature-desc {
+  margin: 0;
+  max-width: 560px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #606266;
 }
 .hero-title {
   margin: 0 0 12px;
-  font-size: 34px;
+  font-size: 32px;
   color: #303133;
 }
 .hero-desc {
   margin: 0 0 24px;
-  font-size: 16px;
+  font-size: 15px;
   color: #606266;
 }
 .school-context {
@@ -197,6 +370,35 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   gap: 12px;
+}
+/* 进度式指示条 */
+.banner-indicators {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 0 18px;
+}
+.indicator {
+  width: 28px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(64, 158, 255, 0.25);
+  cursor: pointer;
+  overflow: hidden;
+  transition: width 0.3s;
+}
+.indicator.active {
+  width: 96px;
+}
+/* 宽度由 JS 每帧写入，与自动翻页共用同一条时钟 */
+.indicator-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--el-color-primary);
 }
 /* 商户发布引导横幅 */
 .merchant-cta {
@@ -260,33 +462,5 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;
-}
-.features {
-  margin-top: 40px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-}
-.feature-card {
-  padding: 28px 24px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
-  text-align: center;
-}
-.feature-icon {
-  font-size: 36px;
-  color: var(--el-color-primary);
-  margin-bottom: 12px;
-}
-.feature-card h3 {
-  margin: 0 0 8px;
-  color: #303133;
-}
-.feature-card p {
-  margin: 0;
-  color: #909399;
-  font-size: 14px;
-  line-height: 1.6;
 }
 </style>

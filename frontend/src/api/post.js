@@ -1,7 +1,12 @@
 import request from './request'
 
-// 笔记列表，params: { school_id, keyword, sort, page, page_size }
+// 笔记列表，params: { school_id, keyword, user_id, sort, page, page_size }
 export const getPostList = (params) => request.get('/posts', { params })
+
+// 某个用户发布的公开笔记（用户主页用）。勿传 sort=recommend——
+// 推荐分支会绕过 user_id 过滤，返回全站推荐流。
+export const getPostsByUser = (userId, params) =>
+  request.get('/posts', { params: { user_id: userId, ...params } })
 
 // 笔记详情
 export const getPostDetail = (postId) => request.get(`/posts/${postId}`)

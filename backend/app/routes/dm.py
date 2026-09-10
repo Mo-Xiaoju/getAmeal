@@ -24,6 +24,13 @@ def get_unread_count():
     return ok(MessageService.unread_count(g.current_user))
 
 
+@bp_dm.route('/suggestions', methods=['GET'])
+@require_login
+def list_suggestions():
+    """推荐可私聊对象（官方助手 / 管理员 / 最近关注）。"""
+    return ok(MessageService.dm_suggestions(g.current_user))
+
+
 @bp_dm.route('/conversations/<int:peer_id>', methods=['GET'])
 @require_login
 def get_peer_messages(peer_id):

@@ -61,6 +61,7 @@ const goDetail = () => {
 </script>
 
 <style scoped>
+/* 与 DishCard/PostCard 同一骨架：撑满格子 + 封面定高，混排时行内高度才对齐 */
 .shop-card {
   background: #fff;
   border: 1px solid #ebeef5;
@@ -68,6 +69,9 @@ const goDetail = () => {
   overflow: hidden;
   cursor: pointer;
   transition: all 0.25s;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .shop-card:hover {
   transform: translateY(-4px);
@@ -76,6 +80,7 @@ const goDetail = () => {
 .shop-cover {
   position: relative;
   height: 150px;
+  flex-shrink: 0;
   background: var(--el-color-primary-light-9);
 }
 .shop-cover img {
@@ -99,6 +104,7 @@ const goDetail = () => {
 }
 .shop-info {
   padding: 14px 16px 16px;
+  flex: 1;
 }
 .shop-name {
   margin: 0 0 6px;

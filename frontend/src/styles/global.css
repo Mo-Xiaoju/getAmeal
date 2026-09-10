@@ -1,0 +1,15 @@
+/* 全局基础样式 */
+
+html {
+  /* 始终为竖向滚动条预留空间：
+     各页面内容长短不同，滚动条会忽隐忽现，可视区宽度随之变化，
+     导致居中的导航栏（max-width + margin:auto）在路由切换时左右抖动 */
+  scrollbar-gutter: stable;
+}
+
+/* 兜底：不支持 scrollbar-gutter 的旧浏览器，恒定显示滚动条以固定宽度 */
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}

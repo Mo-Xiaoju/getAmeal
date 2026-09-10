@@ -1,7 +1,7 @@
 """用户社交业务逻辑：关注 / 取关 / 关注列表。"""
 from app.extensions import db
-from app.models import User, UserFollow
-from app.utils.exceptions import ValidationError
+from app.models import Post, User, UserFollow
+from app.utils.exceptions import NotFoundError, ValidationError
 from app.utils.pagination import paginate
 
 
@@ -62,6 +62,20 @@ class UserService:
         result = paginate(query, page, page_size)
         items = [_user_brief(f.follower, viewer=user) for f in result['items']]
         return {**result, 'items': items}
+
+    @staticmethod
+    def get_public_profile(user_id: int, viewer=None) -> dict:
+        """他人公开主页资料（游客可见，viewer=None 时 is_following 恒为 False）。"""
+        user = db.session.get(User, user_id)
+        if user is None or not user.is_active:
+            raise NotFoundError(message='用户不存在', code=4045)
+        return {
+            **_user_brief(user, viewer=viewer),
+            'role': user.role,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'post_count': Post.query.filter_by(user_id=user.id, is_active=True).count(),
+            **UserService.follow_counts(user.id),
+        }
 
     @staticmethod
     def follow_counts(user_id: int) -> dict:

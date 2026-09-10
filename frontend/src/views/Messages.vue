@@ -12,7 +12,13 @@
             @click="openPeer(c.peer)"
           >
             <el-badge :value="c.unread_count" :hidden="!c.unread_count" :max="99" class="conv-badge">
-              <el-avatar :size="40" :src="c.peer.avatar_url || undefined">
+              <!-- .stop：整行是「打开会话」，点头像要进对方主页 -->
+              <el-avatar
+                class="user-link"
+                :size="40"
+                :src="c.peer.avatar_url || undefined"
+                @click.stop="goUser(c.peer.id)"
+              >
                 {{ (c.peer.nickname || 'U').charAt(0) }}
               </el-avatar>
             </el-badge>
@@ -29,13 +35,37 @@
             <el-empty :image-size="60" description="还没有私信" />
           </div>
         </div>
+
+        <!-- 推荐联系人：贴底常驻，有会话时也可见，随时能发起新私信 -->
+        <div v-if="suggestions.length" class="conv-suggest">
+          <div class="suggest-head">推荐联系人</div>
+          <div class="suggest-list">
+            <div
+              v-for="s in suggestions"
+              :key="s.id"
+              :class="['suggest-item', { active: activePeer?.id === s.id }]"
+              @click="openPeer(s)"
+            >
+              <el-avatar :size="34" :src="s.avatar_url || undefined">
+                {{ (s.nickname || 'U').charAt(0) }}
+              </el-avatar>
+              <span class="suggest-name">{{ s.nickname || s.username }}</span>
+              <el-tag size="small" type="info" effect="plain">{{ s.reason }}</el-tag>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <!-- 右：会话窗口 -->
       <section class="pane-right">
         <template v-if="activePeer">
           <div class="conv-title">
-            <el-avatar :size="30" :src="activePeer.avatar_url || undefined">
+            <el-avatar
+              class="user-link"
+              :size="30"
+              :src="activePeer.avatar_url || undefined"
+              @click="goUser(activePeer.id)"
+            >
               {{ (activePeer.nickname || 'U').charAt(0) }}
             </el-avatar>
             <span>{{ activePeer.nickname }}</span>
@@ -62,6 +92,7 @@ import { ElMessage } from 'element-plus'
 
 import * as dmApi from '@/api/dm'
 import ChatPanel from '@/components/ChatPanel.vue'
+import { useUserNav } from '@/composables/useUserNav'
 import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'
 import { formatConversationTime } from '@/utils/format'
@@ -69,10 +100,12 @@ import { formatConversationTime } from '@/utils/format'
 const route = useRoute()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const { goUser } = useUserNav()
 
 const convs = ref([])
 const activePeer = ref(null)
 const loadingConvs = ref(false)
+const suggestions = ref([])
 
 // 从路由解析发起会话的对端资料（/messages/:userId?peer=...）
 function initialPeer() {
@@ -109,6 +142,16 @@ async function refreshConvs() {
   }
 }
 
+// 推荐联系人（官方助手 / 管理员 / 最近关注）：左栏空置时也能一键开聊
+async function loadSuggestions() {
+  try {
+    const res = await dmApi.getSuggestions()
+    suggestions.value = res.data.data?.items || []
+  } catch (e) {
+    suggestions.value = []
+  }
+}
+
 async function openPeer(peer) {
   if (!peer || peer.id === userStore.userInfo?.id) return
   activePeer.value = { ...peer }
@@ -138,9 +181,12 @@ onMounted(() => {
   const peer = initialPeer()
   if (peer) openPeer(peer)
   refreshConvs()
-  // 会话列表 / 未读数轮询兜底（覆盖 socket 异常断线场景）
+  loadSuggestions()
+  // 会话列表 / 未读数轮询兜底（覆盖 socket 异常断线场景）；推荐联系人一并刷新，
+  // 这样刚聊过的人会从推荐区消失、新关注的人会自动出现
   timer = setInterval(() => {
     refreshConvs()
+    loadSuggestions()
   }, 15000)
 })
 onBeforeUnmount(() => {
@@ -235,6 +281,54 @@ onBeforeUnmount(() => {
 }
 .conv-empty {
   padding: 40px 0;
+}
+/* 推荐联系人：贴底常驻。父级 .pane-left 是纵向 flex，.conv-list 吃满剩余高度，
+   这里 flex-shrink:0 保证它不被会话列表挤走，自身超出时内部滚动。 */
+.conv-suggest {
+  flex-shrink: 0;
+  border-top: 1px solid #ebeef5;
+  background: #fff;
+}
+.suggest-head {
+  padding: 10px 16px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+}
+.suggest-list {
+  max-height: 168px;
+  overflow-y: auto;
+}
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.suggest-item:hover {
+  background: #f0f2f5;
+}
+.suggest-item.active {
+  background: #e6f1fd;
+}
+.suggest-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 头像可点进对方主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
 }
 .pane-right {
   flex: 1;

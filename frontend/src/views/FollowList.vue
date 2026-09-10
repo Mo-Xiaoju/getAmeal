@@ -6,7 +6,12 @@
 
     <div v-loading="postStore.loading" class="user-grid">
       <div v-for="u in items" :key="u.id" class="user-card">
-        <el-avatar :size="48" :src="u.avatar_url || undefined">
+        <el-avatar
+          class="user-link"
+          :size="48"
+          :src="u.avatar_url || undefined"
+          @click="goUser(u.id)"
+        >
           {{ (u.nickname || u.username || 'U').charAt(0) }}
         </el-avatar>
         <div class="user-info">
@@ -52,6 +57,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import Pagination from '@/components/Pagination.vue'
+import { useUserNav } from '@/composables/useUserNav'
 import { usePostStore } from '@/store/post'
 import { useUserStore } from '@/store/user'
 
@@ -62,6 +68,7 @@ const props = defineProps({
 const router = useRouter()
 const postStore = usePostStore()
 const userStore = useUserStore()
+const { goUser } = useUserNav()
 
 const myId = computed(() => userStore.userInfo?.id)
 
@@ -130,6 +137,14 @@ onMounted(() => loadPage(1))
 .user-info {
   flex: 1;
   min-width: 0;
+}
+/* 头像可点进对方主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
 }
 .user-name {
   font-size: 15px;

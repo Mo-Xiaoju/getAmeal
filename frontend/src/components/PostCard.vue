@@ -1,7 +1,13 @@
 <template>
   <div class="post-card" @click="goDetail">
     <div class="post-head">
-      <el-avatar :size="36" :src="post.author?.avatar_url || undefined">
+      <!-- .stop：整张卡片是「进笔记详情」，点头像要进对方主页 -->
+      <el-avatar
+        class="post-avatar"
+        :size="36"
+        :src="post.author?.avatar_url || undefined"
+        @click.stop="goUser(post.author?.id)"
+      >
         {{ (post.author?.nickname || 'U').charAt(0) }}
       </el-avatar>
       <div class="post-author">
@@ -41,6 +47,7 @@ import { useRouter } from 'vue-router'
 import { ChatDotRound, Star, StarFilled } from '@element-plus/icons-vue'
 
 import { openImage } from '@/composables/useImageViewer'
+import { useUserNav } from '@/composables/useUserNav'
 
 // 笔记卡片：笔记列表 / 首页最新笔记复用
 const props = defineProps({
@@ -48,6 +55,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const { goUser } = useUserNav()
 const imageFailed = ref(false)
 
 const formatDate = (iso) => {
@@ -61,6 +69,7 @@ const goDetail = () => {
 </script>
 
 <style scoped>
+/* 与 ShopCard/DishCard 同一骨架：撑满格子 + 封面定高，混排时行内高度才对齐 */
 .post-card {
   background: #fff;
   border: 1px solid #ebeef5;
@@ -68,6 +77,9 @@ const goDetail = () => {
   padding: 16px 18px;
   cursor: pointer;
   transition: all 0.25s;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .post-card:hover {
   transform: translateY(-4px);
@@ -78,6 +90,13 @@ const goDetail = () => {
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+}
+.post-avatar {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.post-avatar:hover {
+  opacity: 0.85;
 }
 .post-author {
   flex: 1;
@@ -97,7 +116,7 @@ const goDetail = () => {
 }
 .post-title {
   margin: 0 0 6px;
-  font-size: 17px;
+  font-size: 16px;
   color: #303133;
   line-height: 1.4;
 }
@@ -113,6 +132,7 @@ const goDetail = () => {
 }
 .post-cover {
   height: 150px;
+  flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -135,6 +155,8 @@ const goDetail = () => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* 卡片被拉伸到与同行最高卡片齐平时，数据栏贴底 */
+  margin-top: auto;
 }
 .post-tags {
   display: flex;

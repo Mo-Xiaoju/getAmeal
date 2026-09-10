@@ -79,7 +79,7 @@ class PostService:
     # ---- 列表与详情 ----
     @staticmethod
     def list(params: dict, user=None) -> dict:
-        """笔记列表：school_id / keyword 过滤，newest / hot / recommend 排序，分页。
+        """笔记列表：school_id / keyword / user_id 过滤，newest / hot / recommend 排序，分页。
 
         recommend 仅首页推荐流使用（走打分引擎 rank_posts）；其余分支语义保持不变。
         """
@@ -96,6 +96,15 @@ class PostService:
             query = query.filter(
                 db.or_(Post.title.like(f'%{keyword}%'), Post.content.like(f'%{keyword}%'))
             )
+
+        # 按作者过滤（他人主页的笔记列表）。注意 sort=recommend 走上面的分支，
+        # 不会经过这里，用户主页统一用默认的 newest 排序。
+        user_id = params.get('user_id')
+        if user_id:
+            try:
+                query = query.filter(Post.user_id == int(user_id))
+            except (TypeError, ValueError):
+                raise ValidationError(message='user_id 参数不合法', code=4000)
 
         sort = params.get('sort')
         if sort == 'hot':

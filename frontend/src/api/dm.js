@@ -15,3 +15,6 @@ export const markPeerRead = (peerId) => request.post(`/dm/conversations/${peerId
 
 // 我收到的未读私信总数
 export const getUnreadCount = () => request.get('/dm/unread-count')
+
+// 推荐可私聊对象（官方助手 / 管理员 / 最近关注），items 带 reason 标签
+export const getSuggestions = () => request.get('/dm/suggestions')

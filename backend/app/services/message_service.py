@@ -8,9 +8,13 @@
 import json
 from datetime import datetime
 
+from flask import current_app
+
 from app.extensions import db, sio
-from app.models import Circle, CircleMembership, Message, School, Shop, User
+from app.models import Circle, CircleMembership, Message, School, Shop, User, UserFollow
 from app.schemas.message import MessageSchema
+from app.services.bot_service import BotService
+from app.services.user_service import _user_brief
 from app.utils.exceptions import PermissionError, ValidationError
 from app.utils.pagination import paginate
 
@@ -100,18 +104,55 @@ class MessageService:
         payload = {'channel': {'type': channel_type, 'id': int(target_id)},
                    'message': _message_schema.dump(msg)}
         MessageService._broadcast(user, channel_type, int(target_id), payload)
+
+        # 官方助手自动回复：仅私信渠道，且收件人正是机器人账号（否则 build_reply 返回 None）
+        if channel_type == 'dm':
+            MessageService._reply_as_bot(user, recipient, text)
         return payload['message']
 
     @staticmethod
     def _broadcast(sender: User, channel_type: str, target_id: int, payload: dict) -> None:
-        """按渠道把消息发到对应 SocketIO 房间（单次广播）。"""
+        """按渠道把消息发到对应 SocketIO 房间。
+
+        私信需对两个房间分别投递：channel.id 在前端表示「收件人视角的对端」
+        （ChatPanel.handleIncoming 拿它与当前会话的 peer 比对），对发送方是
+        target_id，对接收方却是 sender.id。用同一个 payload 广播会让接收方
+        因 channel.id 对不上而丢弃这条实时消息。
+        """
         if channel_type == 'dm':
-            sio.emit('message', payload, to=f'user_{sender.id}')
-            sio.emit('message', payload, to=f'user_{target_id}')
+            sio.emit('message', {**payload, 'channel': {'type': 'dm', 'id': int(target_id)}},
+                     to=f'user_{sender.id}')
+            sio.emit('message', {**payload, 'channel': {'type': 'dm', 'id': sender.id}},
+                     to=f'user_{target_id}')
         elif channel_type == 'circle':
             sio.emit('message', payload, to=f'circle_{target_id}')
         else:
             sio.emit('message', payload, to=f'chat_school_{target_id}')
+
+    @staticmethod
+    def _reply_as_bot(sender: User, recipient: User, text: str) -> None:
+        """机器人回复私信：落库后广播，发送方无需刷新即可实时收到。
+
+        刻意不复用 MessageService.send——send 带商户拦截、自聊拦截、店铺关联校验，
+        机器人内部回复不应受这些用户侧规则约束。
+
+        异常必须就地吞掉：本方法处在 socket send 事件链路里，一旦抛出，on_send
+        会返回 ok:false，前端随即改用 REST 重发，用户那条消息就会重复入库。
+        """
+        try:
+            reply = BotService.build_reply(sender, recipient, text)
+            if not reply:
+                return
+            bot_msg = Message(user_id=recipient.id, content=reply[:1000], recipient_id=sender.id)
+            db.session.add(bot_msg)
+            db.session.commit()
+            MessageService._broadcast(recipient, 'dm', sender.id, {
+                'channel': {'type': 'dm', 'id': sender.id},
+                'message': _message_schema.dump(bot_msg),
+            })
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('官方助手自动回复失败')
 
     # ---- 圈子群聊历史 ----
     @staticmethod
@@ -197,6 +238,59 @@ class MessageService:
                     'last_message': _message_schema.dump(last),
                     'unread_count': unread_by_peer.get(peer_id, 0),
                 })
+        return {'items': items, 'total': len(items)}
+
+    @staticmethod
+    def dm_suggestions(user: User, limit: int = 8) -> dict:
+        """推荐可私聊对象：官方助手 / 管理员 / 最近关注。
+
+        排除自己、停用账号、商户（require_consumer 会拒绝商户发私信，推荐过去是坏体验），
+        以及已有会话的对象（左栏会话列表里已经在了，重复展示浪费版面）。
+        """
+        # 已有会话的对端 id：只关心私信行，群聊行的 recipient_id 为 NULL
+        dm_rows = Message.query.filter(
+            Message.recipient_id.isnot(None),
+            db.or_(Message.user_id == user.id, Message.recipient_id == user.id),
+        ).all()
+        peer_ids = {
+            m.user_id if m.recipient_id == user.id else m.recipient_id for m in dm_rows
+        }
+
+        picked = []  # [(User, reason)]
+        seen = set()
+
+        def _take(candidate, reason):
+            if candidate is None or candidate.id in seen:
+                return
+            if candidate.id == user.id or not candidate.is_active:
+                return
+            if candidate.role == 'merchant' or candidate.id in peer_ids:
+                return
+            seen.add(candidate.id)
+            picked.append((candidate, reason))
+
+        _take(BotService.get_bot(), '官方助手')
+        admins = (
+            User.query.filter_by(role='admin', is_active=True)
+            .order_by(User.id.asc())
+            .limit(3)
+            .all()
+        )
+        for admin in admins:
+            _take(admin, '管理员')
+
+        follows = (
+            UserFollow.query.filter_by(follower_id=user.id)
+            .order_by(UserFollow.id.desc())
+            .limit(limit)
+            .all()
+        )
+        for follow in follows:
+            _take(follow.followee, '最近关注')
+
+        items = [
+            {**_user_brief(u, viewer=user), 'reason': reason} for u, reason in picked[:limit]
+        ]
         return {'items': items, 'total': len(items)}
 
     @staticmethod

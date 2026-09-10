@@ -20,3 +20,6 @@ export const getMyReviews = (params) => request.get('/user/reviews', { params })
 
 // 删除我的某条评价
 export const deleteReview = (reviewId) => request.delete(`/user/reviews/${reviewId}`)
+
+// 他人公开主页资料（游客可见；带登录态时 data.is_following 生效）
+export const getUserProfile = (userId) => request.get(`/user/${userId}/profile`)

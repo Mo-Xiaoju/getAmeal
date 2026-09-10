@@ -39,7 +39,12 @@
                 <el-icon class="msg-shop-arrow"><ArrowRight /></el-icon>
               </div>
             </div>
-            <el-avatar :size="34" :src="m.author?.avatar_url || undefined" class="msg-avatar">
+            <el-avatar
+              :size="34"
+              :src="m.author?.avatar_url || undefined"
+              class="msg-avatar clickable-avatar"
+              @click="goUser(m.author?.id)"
+            >
               {{ (m.author?.nickname || 'U').charAt(0) }}
             </el-avatar>
           </div>
@@ -86,6 +91,7 @@ import * as circleApi from '@/api/circle'
 import * as dmApi from '@/api/dm'
 import * as shopApi from '@/api/shop'
 import MessageInput from '@/components/MessageInput.vue'
+import { useUserNav } from '@/composables/useUserNav'
 import { useChatStore } from '@/store/chat'
 import { useUserStore } from '@/store/user'
 import { formatDateTime } from '@/utils/format'
@@ -95,6 +101,7 @@ const props = defineProps({
   schoolId: { type: Number, default: null }, // 圈子群聊所属学校；校园群聊自身即学校，用不到
 })
 const router = useRouter()
+const { goUser } = useUserNav()
 
 const PAGE_SIZE = 30
 const userStore = useUserStore()
@@ -308,6 +315,13 @@ onBeforeUnmount(() => {
 }
 .msg-avatar {
   flex-shrink: 0;
+}
+/* 头像可点进发送者主页 */
+.clickable-avatar {
+  cursor: pointer;
+}
+.clickable-avatar:hover {
+  opacity: 0.85;
 }
 .msg-main {
   max-width: 62%;

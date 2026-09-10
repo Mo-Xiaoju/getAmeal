@@ -101,7 +101,12 @@
           description="还没有评价，来发表第一条吧"
         />
         <div v-for="review in shopStore.reviews" :key="review.id" class="review-item">
-          <el-avatar :size="40" :src="review.avatar_url || undefined">
+          <el-avatar
+            class="user-link"
+            :size="40"
+            :src="review.avatar_url || undefined"
+            @click="goUser(review.user_id)"
+          >
             {{ (review.nickname || 'U').charAt(0) }}
           </el-avatar>
           <div class="review-body">
@@ -163,6 +168,7 @@ import { submitDish } from '@/api/contribute'
 import DishCard from '@/components/DishCard.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
 import { openImage } from '@/composables/useImageViewer'
+import { useUserNav } from '@/composables/useUserNav'
 import Pagination from '@/components/Pagination.vue'
 import RatingStars from '@/components/RatingStars.vue'
 import { useDishStore } from '@/store/dish'
@@ -171,6 +177,7 @@ import { useUserStore } from '@/store/user'
 
 const route = useRoute()
 const router = useRouter()
+const { goUser } = useUserNav()
 const shopStore = useShopStore()
 const userStore = useUserStore()
 const dishStore = useDishStore()
@@ -460,6 +467,14 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
+}
+/* 头像可点进评价者主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
 }
 .review-time {
   font-size: 12px;

@@ -82,15 +82,20 @@ onMounted(() => loadPage(1))
 }
 .post-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 18px;
-  align-items: start;
   min-height: 120px;
 }
 .like-item {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  height: 100%;
+}
+/* 卡片撑满格子的剩余高度，有无配图的笔记卡片才会等高 */
+.like-item :deep(.post-card) {
+  flex: 1;
+  min-height: 0;
 }
 .item-actions {
   display: flex;

@@ -65,7 +65,12 @@
         <div v-loading="reviewsLoading" class="review-list">
           <el-empty v-if="!reviewsLoading && !reviews.length" description="暂无评价" />
           <div v-for="review in reviews" :key="review.id" class="review-item">
-            <el-avatar :size="40" :src="review.avatar_url || undefined">
+            <el-avatar
+              class="user-link"
+              :size="40"
+              :src="review.avatar_url || undefined"
+              @click="goUser(review.user_id)"
+            >
               {{ (review.nickname || 'U').charAt(0) }}
             </el-avatar>
             <div class="review-body">
@@ -94,11 +99,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { Food, Shop } from '@element-plus/icons-vue'
 
 import RatingStars from '@/components/RatingStars.vue'
+import { useUserNav } from '@/composables/useUserNav'
 import { useDishStore } from '@/store/dish'
 import { useShopStore } from '@/store/shop'
 
 const route = useRoute()
 const router = useRouter()
+const { goUser } = useUserNav()
 const dishStore = useDishStore()
 const shopStore = useShopStore()
 
@@ -299,6 +306,14 @@ onMounted(async () => {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
+}
+/* 头像可点进评价者主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
 }
 .review-time {
   font-size: 12px;

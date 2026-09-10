@@ -6,12 +6,14 @@
   flask seed-posts       # 写入演示用探店笔记 + 演示用户
   flask seed-merchant    # 写入演示商户账号并绑定一家店铺
   flask seed-admin       # 写入演示管理员账号
+  flask seed-bot         # 写入官方消息机器人账号（自动回复私信）
   flask seed-circles     # 写入演示圈子 + 圈内群聊/私信/全校群聊消息
   flask seed-rec-demo    # 写入首页推荐流演示数据：独立虚拟学校 + 口味账号 + 店铺/菜品/笔记/行为
   flask import-schools   # 从 data/schools.json 全量导入全国高校名单
 """
 import json
 import os
+import secrets
 from datetime import datetime, timedelta
 
 import click
@@ -372,6 +374,30 @@ def register_cli(app) -> None:
             print(f'seed-admin 完成：新增演示管理员 {username}/demo1234（角色 admin）。')
         else:
             print(f'seed-admin 完成：管理员 {username} 已存在，无需新增。')
+
+    @app.cli.command('seed-bot')
+    def seed_bot():
+        """写入官方消息机器人账号（幂等，可重复执行）。
+
+        机器人是普通用户账号（role='student'），靠保留用户名识别；
+        密码取随机串，使其无法被登录，避免变成共享账号。
+        """
+        from app.services.bot_service import BOT_NICKNAME, BOT_USERNAME
+
+        user = User.query.filter_by(username=BOT_USERNAME).first()
+        if user is not None:
+            print(f'seed-bot 完成：机器人 {BOT_USERNAME} 已存在，无需新增。')
+            return
+
+        user = User(
+            username=BOT_USERNAME,
+            nickname=BOT_NICKNAME,
+            role='student',
+        )
+        user.set_password(secrets.token_urlsafe(32))
+        db.session.add(user)
+        db.session.commit()
+        print(f'seed-bot 完成：新增官方助手 {BOT_USERNAME}（昵称「{BOT_NICKNAME}」，不可登录，自动回复私信）。')
 
     @app.cli.command('seed-circles')
     def seed_circles():

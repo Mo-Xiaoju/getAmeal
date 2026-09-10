@@ -78,10 +78,15 @@
     <el-drawer v-model="membersVisible" :title="`成员 · ${circleStore.detail?.member_count || ''}`" size="340px">
       <div class="member-list">
         <div v-for="m in circleStore.members" :key="m.id" class="member-row">
-          <el-avatar :size="36" :src="m.avatar_url || undefined">
+          <el-avatar
+            class="user-link"
+            :size="36"
+            :src="m.avatar_url || undefined"
+            @click="goMember(m.id)"
+          >
             {{ (m.nickname || 'U').charAt(0) }}
           </el-avatar>
-          <span class="member-name">{{ m.nickname }}</span>
+          <span class="member-name user-link" @click="goMember(m.id)">{{ m.nickname }}</span>
           <el-tag v-if="m.id === circleStore.detail?.creator?.id" size="small" type="warning">创建者</el-tag>
         </div>
       </div>
@@ -119,6 +124,7 @@ import {
 
 import ChatPanel from '@/components/ChatPanel.vue'
 import ImageField from '@/components/ImageField.vue'
+import { useUserNav } from '@/composables/useUserNav'
 import { useChatStore } from '@/store/chat'
 import { useCircleStore } from '@/store/circle'
 import { useUserStore } from '@/store/user'
@@ -128,6 +134,13 @@ const router = useRouter()
 const circleStore = useCircleStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const { goUser } = useUserNav()
+
+// 从成员抽屉点人：先收起抽屉，否则导航后抽屉还悬在主页上
+const goMember = (id) => {
+  membersVisible.value = false
+  goUser(id)
+}
 
 const loading = ref(false)
 const joining = ref(false)
@@ -349,6 +362,17 @@ onBeforeUnmount(() => {
   flex: 1;
   font-size: 14px;
   color: #303133;
+}
+/* 头像 / 昵称可点进成员主页 */
+.user-link {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.user-link:hover {
+  opacity: 0.85;
+}
+.member-name.user-link:hover {
+  color: var(--el-color-primary);
 }
 /* 编辑圈子弹窗：label 固定不换行，避免“圈子名称”因必填星号挤成两行 */
 .edit-form :deep(.el-form-item__label) {
