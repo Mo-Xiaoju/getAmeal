@@ -1,10 +1,13 @@
 """管理后台业务逻辑。"""
 
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
+from sqlalchemy import case, func
 
 from app.extensions import db
-from app.models import Dish, School, Shop, User
+from app.models import Dish, EventLog, School, Shop, User
+from app.services.event_log_service import EventLogService
 from app.utils.exceptions import NotFoundError, ValidationError
 from app.utils.pagination import paginate
 
@@ -244,6 +247,17 @@ class AdminService:
         entity.reviewed_at = datetime.utcnow()
         entity.reject_reason = reason if action == 'reject' else None
 
+        # 埋点：店铺 / 菜品 审核通过或驳回（单店/整店/单菜品审核都汇聚于此）
+        target_type = 'shop' if isinstance(entity, Shop) else 'dish'
+        school_id = entity.school_id if target_type == 'shop' else (
+            entity.shop.school_id if entity.shop else None
+        )
+        EventLogService.record(
+            admin, f'{target_type}_{action}',
+            target_type=target_type, target_id=entity.id, school_id=school_id,
+            extra={'name': entity.name, 'reason': reason} if reason else {'name': entity.name},
+        )
+
     @staticmethod
     def review_shop(admin, shop_id: int, data: dict) -> dict:
         """单店审核（通过 / 驳回）。"""
@@ -298,4 +312,123 @@ class AdminService:
             'id': dish.id,
             'name': dish.name,
             'status': dish.status,
+        }
+
+    # ---- 数据统计（埋点看板） ----
+    @staticmethod
+    def get_stats(params: dict) -> dict:
+        """数据统计看板聚合数据：概览 + 近 N 天趋势 + 类型/学校分布。"""
+        days = int(params.get('days') or 14)
+        days = max(min(days, 90), 1)
+        since = datetime.utcnow() - timedelta(days=days)
+
+        submit_types = ('shop_submit', 'dish_submit')
+        approve_types = ('shop_approve', 'dish_approve')
+        reject_types = ('shop_reject', 'dish_reject')
+
+        # 概览：存量 + 事件计数 + 通过率
+        total_submits = EventLog.query.filter(EventLog.event_type.in_(submit_types)).count()
+        total_approves = EventLog.query.filter(EventLog.event_type.in_(approve_types)).count()
+        total_rejects = EventLog.query.filter(EventLog.event_type.in_(reject_types)).count()
+        reviewed = total_approves + total_rejects
+        summary = {
+            'total_users': User.query.count(),
+            'total_shops': Shop.query.count(),
+            'total_dishes': Dish.query.count(),
+            'total_events': EventLog.query.count(),
+            'total_submits': total_submits,
+            'total_approves': total_approves,
+            'total_rejects': total_rejects,
+            'approval_rate': round(total_approves / reviewed, 4) if reviewed else 0.0,
+        }
+
+        # 趋势：近 N 天按天聚合
+        trend_rows = (
+            db.session.query(
+                func.date(EventLog.created_at).label('day'),
+                func.sum(case((EventLog.event_type.in_(submit_types), 1), else_=0)).label('submits'),
+                func.sum(case((EventLog.event_type.in_(approve_types), 1), else_=0)).label('approves'),
+                func.sum(case((EventLog.event_type.in_(reject_types), 1), else_=0)).label('rejects'),
+            )
+            .filter(EventLog.created_at >= since)
+            .group_by(func.date(EventLog.created_at))
+            .all()
+        )
+        by_day = {
+            str(r.day): {
+                'submits': int(r.submits or 0),
+                'approves': int(r.approves or 0),
+                'rejects': int(r.rejects or 0),
+            }
+            for r in trend_rows
+        }
+        today = datetime.utcnow().date()
+        trend = []
+        for i in range(days - 1, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            trend.append({'date': d, **by_day.get(d, {'submits': 0, 'approves': 0, 'rejects': 0})})
+
+        # 按事件类型分布
+        by_type = [
+            {'event_type': et, 'count': c}
+            for et, c in (
+                db.session.query(EventLog.event_type, func.count(EventLog.id))
+                .group_by(EventLog.event_type)
+                .order_by(func.count(EventLog.id).desc())
+                .all()
+            )
+        ]
+
+        # 按学校分布
+        by_school = [
+            {'school_id': sid, 'name': name, 'count': c}
+            for sid, name, c in (
+                db.session.query(EventLog.school_id, School.name, func.count(EventLog.id))
+                .join(School, School.id == EventLog.school_id)
+                .group_by(EventLog.school_id, School.name)
+                .order_by(func.count(EventLog.id).desc())
+                .all()
+            )
+        ]
+
+        return {
+            'summary': summary,
+            'trend': trend,
+            'by_type': by_type,
+            'by_school': by_school,
+        }
+
+    @staticmethod
+    def list_events(params: dict) -> dict:
+        """事件明细列表（分页，可按 event_type 过滤）。"""
+        query = EventLog.query.order_by(EventLog.id.desc())
+        event_type = (params.get('event_type') or '').strip()
+        if event_type:
+            query = query.filter(EventLog.event_type == event_type)
+        page = int(params.get('page') or 1)
+        page_size = int(params.get('page_size') or 20)
+        result = paginate(query, page, page_size)
+        return {**result, 'items': [AdminService._event_view(e) for e in result['items']]}
+
+    @staticmethod
+    def _event_view(log: EventLog) -> dict:
+        """事件日志序列化。"""
+        extra = None
+        if log.extra:
+            try:
+                extra = json.loads(log.extra)
+            except (ValueError, TypeError):
+                extra = log.extra
+        return {
+            'id': log.id,
+            'actor_id': log.actor_id,
+            'actor_role': log.actor_role,
+            'actor_nickname': log.actor.nickname if log.actor else None,
+            'event_type': log.event_type,
+            'target_type': log.target_type,
+            'target_id': log.target_id,
+            'school_id': log.school_id,
+            'school_name': log.school.name if log.school else None,
+            'extra': extra,
+            'created_at': log.created_at.isoformat() if log.created_at else None,
         }

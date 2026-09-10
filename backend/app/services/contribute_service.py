@@ -14,6 +14,7 @@ from app.models import Dish, Shop
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
 from app.schemas.shop import ShopCreateSchema, ShopSchema, ShopUpdateSchema
 from app.services.dish_service import apply_dish_images_for_create, sync_dish_images
+from app.services.event_log_service import EventLogService
 from app.utils.exceptions import ApiError, NotFoundError, PermissionError, ValidationError
 
 _shop_schema = ShopSchema()
@@ -163,6 +164,10 @@ class ContributeService:
         shop = Shop(**data, owner_id=user.id, status='pending')
         db.session.add(shop)
         try:
+            db.session.flush()  # 拿到 shop.id 供埋点
+            EventLogService.record(user, 'shop_submit', target_type='shop', target_id=shop.id,
+                                   school_id=shop.school_id,
+                                   extra={'name': shop.name, 'category': shop.category})
             db.session.commit()
         except Exception:
             db.session.rollback()
@@ -216,6 +221,9 @@ class ContributeService:
         tags = ','.join(t.strip() for t in data.pop('tags') or [] if t and t.strip())
         dish = Dish(shop_id=shop.id, owner_id=user.id, status='pending', tags=tags or None, **data)
         db.session.add(dish)
+        db.session.flush()  # 拿到 dish.id 供埋点
+        EventLogService.record(user, 'dish_submit', target_type='dish', target_id=dish.id,
+                               school_id=shop.school_id, extra={'name': dish.name})
         db.session.commit()
         return _dish_schema.dump(dish)
 

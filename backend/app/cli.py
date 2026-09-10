@@ -24,6 +24,7 @@ from app.models import (
     CircleMembership,
     Comment,
     Dish,
+    EventLog,
     Favorite,
     Like,
     Message,
@@ -735,3 +736,68 @@ def register_cli(app) -> None:
             db.session.commit()
             print(f'\n已回填 {sum(n for _, _, n in plan)} 家（{len(plan)} 类别名）。')
         print(f'当前非规范残留 {len(leftovers)} 家。')
+
+    @app.cli.command('seed-events')
+    def seed_events():
+        """回填近 30 天演示埋点事件，供管理员「数据统计」看板展示（幂等：已有事件则跳过）。"""
+        if EventLog.query.count() > 0:
+            print('检测到 event_logs 已存在，跳过 seed-events。')
+            return
+
+        schools = School.query.filter_by(is_active=True).all()
+        if not schools:
+            print('没有学校数据，请先运行 flask seed-demo 再执行本命令。')
+            return
+
+        users = User.query.all()
+        admin = next((u for u in users if u.role == 'admin'), users[0] if users else None)
+        shops = Shop.query.filter_by(is_active=True).all()
+        dishes = Dish.query.filter_by(is_active=True).all()
+        posts = Post.query.filter_by(is_active=True).all()
+
+        now = datetime.utcnow()
+
+        def add_event(event_type, target_type, target_id, school, days_back, extra=None):
+            log = EventLog(
+                actor_id=admin.id if admin else None,
+                actor_role=admin.role if admin else None,
+                event_type=event_type,
+                target_type=target_type,
+                target_id=target_id,
+                school_id=school.id if school else None,
+                extra=json.dumps(extra, ensure_ascii=False) if extra else None,
+                created_at=now - timedelta(days=days_back),
+            )
+            db.session.add(log)
+
+        # 店铺：提交 + 通过（少量驳回）
+        for i, shop in enumerate(shops[:10]):
+            school = shop.school or schools[i % len(schools)]
+            days = (i * 3 % 28) + 1
+            add_event('shop_submit', 'shop', shop.id, school, days,
+                      {'name': shop.name, 'category': shop.category})
+            if i % 5 == 0:
+                add_event('shop_reject', 'shop', shop.id, school, days - 0.5,
+                          {'name': shop.name, 'reason': '资料不完整'})
+            else:
+                add_event('shop_approve', 'shop', shop.id, school, days - 0.5, {'name': shop.name})
+
+        # 菜品：提交 + 通过（少量驳回）
+        for i, dish in enumerate(dishes[:16]):
+            school = dish.shop.school if dish.shop else schools[i % len(schools)]
+            days = (i * 2 % 27) + 1
+            add_event('dish_submit', 'dish', dish.id, school, days, {'name': dish.name})
+            if i % 6 == 0:
+                add_event('dish_reject', 'dish', dish.id, school, days - 0.5,
+                          {'name': dish.name, 'reason': '图片缺失'})
+            else:
+                add_event('dish_approve', 'dish', dish.id, school, days - 0.5, {'name': dish.name})
+
+        # 笔记：发布
+        for i, post in enumerate(posts[:8]):
+            school = post.shop.school if post.shop else schools[i % len(schools)]
+            days = (i * 4 % 25) + 1
+            add_event('post_create', 'post', post.id, school, days, {'title': post.title})
+
+        db.session.commit()
+        print(f'seed-events 完成：回填 {EventLog.query.count()} 条事件（近 30 天），供管理员「数据统计」看板展示。')

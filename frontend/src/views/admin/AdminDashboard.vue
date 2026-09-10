@@ -5,7 +5,6 @@
         <h1 class="page-title">管理后台</h1>
         <p class="page-desc">用户、店铺与内容审核统一管理</p>
       </div>
-      <el-button :icon="Refresh" plain @click="handleRefresh">刷新</el-button>
     </div>
 
 
@@ -17,8 +16,8 @@
             <div class="panel-head">
               <span>用户列表</span>
               <span class="panel-hint">可直接修改角色（学生 / 商户 / 管理员）或停用账号</span>
+              <el-button class="panel-refresh" size="small" :icon="Refresh" @click="loadUsers(1)">刷新</el-button>
             </div>
-
           </template>
 
           <el-table v-loading="loadingUsers" :data="users" :key="'users-' + users.length" stripe>
@@ -76,7 +75,10 @@
           <template #header>
             <div class="panel-head">
               <span>店铺列表</span>
-              <el-button type="primary" size="small" @click="openShopDialog()">新增店铺</el-button>
+              <div class="panel-actions">
+                <el-button size="small" :icon="Refresh" @click="loadShops(1)">刷新</el-button>
+                <el-button type="primary" size="small" @click="openShopDialog()">新增店铺</el-button>
+              </div>
             </div>
           </template>
 
@@ -121,6 +123,11 @@
       <!-- 内容审核 -->
       <el-tab-pane label="内容审核" name="audit">
         <AuditQueue />
+      </el-tab-pane>
+
+      <!-- 数据统计（埋点看板） -->
+      <el-tab-pane label="数据统计" name="stats" lazy>
+        <AdminStats />
       </el-tab-pane>
     </el-tabs>
 
@@ -174,6 +181,7 @@ import {
 import { useUserStore } from '@/store/user'
 
 import AuditQueue from './AuditQueue.vue'
+import AdminStats from './AdminStats.vue'
 
 const userStore = useUserStore()
 const adminTab = ref('users')
@@ -210,12 +218,6 @@ const formatDate = (iso) => {
   if (!iso) return '-'
   const d = new Date(iso)
   return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
-const handleRefresh = () => {
-  if (activeTab.value === 'users') loadUsers(1)
-  else if (activeTab.value === 'shops') loadShops(1)
-  // audit tab 内部自己处理刷新
 }
 
 // ---- 用户管理 ----
@@ -363,6 +365,14 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   font-weight: 400;
+}
+.panel-refresh {
+  margin-left: auto;
+}
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 .pagination-wrap {
   display: flex;
