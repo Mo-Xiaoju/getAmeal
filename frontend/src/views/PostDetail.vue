@@ -1,10 +1,46 @@
 <template>
-  <div v-loading="postStore.loading" class="post-detail">
+  <div class="post-detail">
     <div class="page-head">
       <el-page-header content="笔记详情" @back="router.back()" />
     </div>
 
-    <div v-if="postStore.postDetail" class="post-main">
+    <!-- 详情拿不到（笔记已删除 / 不存在）：骨架屏不能一直转下去，给明确空态与返回入口 -->
+    <div v-if="notFound" class="not-found">
+      <el-empty description="笔记不存在或已被删除">
+        <el-button type="primary" plain @click="router.push('/posts')">返回笔记列表</el-button>
+      </el-empty>
+    </div>
+
+    <!-- 首次进入 / 切换笔记时先渲染骨架：避免"空白 → 整页白遮罩闪一下 → 内容整块冒出"。
+         同一篇重复请求时 store 里数据还在（fetchDetail 不清），直接渲染，不经过骨架。
+         容器复用 .post-main（白卡片），骨架与内容同宽同内边距，切换时不跳 -->
+    <el-skeleton v-else-if="!postStore.postDetail" animated class="post-main">
+      <template #template>
+        <div class="author-row">
+          <el-skeleton-item variant="circle" class="skeleton-avatar" />
+          <div class="author-info">
+            <el-skeleton-item variant="text" style="width: 30%" />
+            <el-skeleton-item variant="text" style="width: 45%; margin-top: 6px" />
+          </div>
+        </div>
+        <el-skeleton-item variant="h1" style="width: 60%" />
+        <el-skeleton-item variant="text" style="width: 100%; margin: 18px 0 10px" />
+        <el-skeleton-item variant="text" style="width: 94%; margin-bottom: 10px" />
+        <el-skeleton-item variant="text" style="width: 68%" />
+        <div class="skeleton-actions">
+          <el-skeleton-item variant="button" />
+          <el-skeleton-item variant="button" />
+        </div>
+        <div class="comment-section">
+          <el-skeleton-item variant="h3" style="width: 120px; margin-bottom: 16px" />
+          <div class="comment-list">
+            <el-skeleton :rows="3" animated />
+          </div>
+        </div>
+      </template>
+    </el-skeleton>
+
+    <div v-else class="post-main">
       <!-- 作者行 -->
       <div class="author-row">
         <el-avatar
@@ -63,18 +99,22 @@
 
       <!-- 互动栏：商户只读，不渲染点赞/收藏（后端 4031，评论区同理见下） -->
       <div v-if="!userStore.isMerchant" class="action-bar">
+        <!-- 点赞 = 大拇指、收藏 = 五角星，两个图形不再撞车。
+             两种状态都靠"描边 → 实心 + 变色"表示（图标走默认插槽，才能把 filled 传进去；
+             :icon 只能给组件本身，传不了 props）。
+             颜色沿用按钮类型：已点赞 danger 红、已收藏 warning 黄，与列表卡片一致 -->
         <el-button
           :type="post.liked ? 'danger' : 'default'"
-          :icon="post.liked ? StarFilled : Star"
           @click="handleLike"
         >
+          <el-icon><ThumbUpIcon :filled="!!post.liked" /></el-icon>
           点赞 {{ post.like_count || 0 }}
         </el-button>
         <el-button
           :type="post.favorited ? 'warning' : 'default'"
-          :icon="post.favorited ? StarFilled : Star"
           @click="handleFavorite"
         >
+          <el-icon><StarIcon :filled="!!post.favorited" /></el-icon>
           收藏 {{ post.favorite_count || 0 }}
         </el-button>
         <el-button
@@ -104,8 +144,12 @@
           </div>
         </div>
 
-        <div v-loading="commentsLoading" class="comment-list">
-          <el-empty v-if="!commentsLoading && !postStore.comments.length" description="暂无评论，抢个沙发" />
+        <!-- 只在"没有任何评论可显示"时用骨架占位，已有列表时不再盖一层白遮罩 -->
+        <div v-if="commentsLoading && !postStore.comments.length" class="comment-list">
+          <el-skeleton :rows="3" animated />
+        </div>
+        <div v-else class="comment-list">
+          <el-empty v-if="!postStore.comments.length" description="暂无评论，抢个沙发" />
           <div v-for="c in postStore.comments" :key="c.id" class="comment-item">
             <el-avatar
               class="user-link"
@@ -133,8 +177,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Shop, Star, StarFilled } from '@element-plus/icons-vue'
+import { Shop } from '@element-plus/icons-vue'
 
+import StarIcon from '@/components/StarIcon.vue'
+import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
 import { openImage } from '@/composables/useImageViewer'
 import { useUserNav } from '@/composables/useUserNav'
 import { usePostStore } from '@/store/post'
@@ -150,7 +196,10 @@ const postId = computed(() => Number(route.params.id))
 const post = computed(() => postStore.postDetail || {})
 const commentText = ref('')
 const commenting = ref(false)
-const commentsLoading = ref(false)
+// 初始即 true：评论要等详情返回后才请求，先按"加载中"渲染，避免闪一下"暂无评论"
+const commentsLoading = ref(true)
+// 详情请求失败（笔记已删除 / 不存在）：页面切空态而不是停在骨架屏上
+const notFound = ref(false)
 
 const isMine = computed(() => userStore.userInfo?.id === post.value.user_id)
 // 关注同样仅学生账号可用（后端 require_consumer），商户不渲染
@@ -233,7 +282,20 @@ const handleComment = async () => {
 }
 
 onMounted(async () => {
-  await postStore.fetchDetail(postId.value)
+  let detail
+  try {
+    detail = await postStore.fetchDetail(postId.value)
+  } catch (e) {
+    // 笔记已删除 / 不存在：接口层已提示，这里切空态并解除评论骨架
+    notFound.value = true
+    commentsLoading.value = false
+    return
+  }
+  if (!detail) {
+    // 详情没拿到（接口返回空）：解除评论骨架，交给空态文案
+    commentsLoading.value = false
+    return
+  }
   loadComments()
 })
 </script>
@@ -253,6 +315,25 @@ onMounted(async () => {
   border: 1px solid #ebeef5;
   border-radius: 16px;
   padding: 28px 32px;
+}
+/* 空态：与详情卡同一套外观（白底卡片），页面不至于只是一片空白 */
+.not-found {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
+}
+/* 骨架屏：容器类复用真实布局（author-row / author-info / comment-section），
+   这里只补头像尺寸和互动栏那一行的间距 */
+.skeleton-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-actions {
+  display: flex;
+  gap: 12px;
+  margin: 22px 0 28px;
 }
 .author-row {
   display: flex;

@@ -19,7 +19,9 @@ export const useChatStore = defineStore('chat', {
     connect() {
       const token = getToken()
       if (socket || !token) return
-      socket = io({ auth: { token }, transports: ['websocket', 'polling'] })
+      // 不指定 transports：websocket 直连会让 werkzeug 开发服务器在会话结束时误记 500，
+      // 走默认的 轮询→升级 即可，最终仍落在 websocket 传输上。
+      socket = io({ auth: { token } })
 
       socket.on('connect', () => {
         this.connected = true

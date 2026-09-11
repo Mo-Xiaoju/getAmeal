@@ -40,7 +40,7 @@
 
         <!-- 未登录 -->
         <template v-if="!userStore.isLoggedIn">
-          <router-link to="/login"><el-button type="primary" plain>登录</el-button></router-link>
+          <router-link to="/login"><el-button type="primary" plain class="login-btn">登录</el-button></router-link>
           <router-link to="/register"><el-button type="primary">注册</el-button></router-link>
         </template>
 
@@ -76,10 +76,12 @@
                   <el-icon><EditPen /></el-icon>提交商户 / 菜单
                 </el-dropdown-item>
                 <el-dropdown-item v-if="!userStore.isMerchant" command="favorites">
-                  <el-icon><Star /></el-icon>我的收藏
+                  <!-- 与列表卡片 / 详情页同一对图标：全站"点赞 = 大拇指，收藏 = 五角星"；
+                       这里是入口不是状态，两枚都用描边款 -->
+                  <el-icon><StarIcon /></el-icon>我的收藏
                 </el-dropdown-item>
                 <el-dropdown-item v-if="!userStore.isMerchant" command="likes">
-                  <el-icon><Pointer /></el-icon>我的点赞
+                  <el-icon><ThumbUpIcon /></el-icon>我的点赞
                 </el-dropdown-item>
                 <el-dropdown-item v-if="!userStore.isMerchant" command="history">
                   <el-icon><Clock /></el-icon>浏览记录
@@ -104,10 +106,12 @@ import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowDown, Bowl, ChatLineRound, Clock, EditPen, Pointer, School, Setting, Shop,
-  Star, SwitchButton, User,
+  ArrowDown, Bowl, ChatLineRound, Clock, EditPen, School, Setting, Shop,
+  SwitchButton, User,
 } from '@element-plus/icons-vue'
 
+import StarIcon from '@/components/StarIcon.vue'
+import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
 import { useChatStore } from '@/store/chat'
 import { useSchoolStore } from '@/store/school'
 import { useUserStore } from '@/store/user'
@@ -257,6 +261,13 @@ const handleCommand = async (command) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+/* 登录按钮悬停不再填成实心主色（会与"注册"完全一样），改为淡底加深、文字保持主色，
+   与 school-chip 悬停同一套色阶；覆盖 Element 的 --el-button-hover-* 变量 */
+.navbar-right .login-btn.el-button {
+  --el-button-hover-text-color: var(--el-color-primary);
+  --el-button-hover-bg-color: var(--el-color-primary-light-7);
+  --el-button-hover-border-color: var(--el-color-primary-light-5);
 }
 .dm-link {
   display: inline-flex;

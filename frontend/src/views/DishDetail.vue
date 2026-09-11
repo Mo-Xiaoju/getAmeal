@@ -1,10 +1,42 @@
 <template>
-  <div v-loading="dishStore.loading" class="dish-detail">
+  <div class="dish-detail">
     <div class="page-head">
       <el-page-header content="菜品详情" @back="router.back()" />
     </div>
 
-    <div v-if="dishStore.dishDetail" class="dish-main">
+    <!-- 详情拿不到（菜品不存在 / 已下架）：骨架屏不能一直转下去，给明确空态 -->
+    <div v-if="notFound" class="not-found">
+      <el-empty description="菜品不存在或已下架">
+        <el-button type="primary" plain @click="router.back()">返回上一页</el-button>
+      </el-empty>
+    </div>
+
+    <!-- 首次进入 / 切换菜品时先渲染骨架：避免"空白 → 整页白遮罩闪一下 → 内容整块冒出"。
+         同一道菜重复请求时 store 里数据还在（fetchDishDetail 不清），直接渲染，不经过骨架 -->
+    <el-skeleton v-else-if="!dishStore.dishDetail" animated>
+      <template #template>
+        <!-- 容器复用真实布局的类（dish-hero / dish-info / review-section），保证同形同高 -->
+        <div class="dish-hero">
+          <el-skeleton-item variant="image" class="skeleton-cover" />
+          <div class="dish-info">
+            <el-skeleton-item variant="text" style="width: 30%" />
+            <el-skeleton-item variant="h1" style="width: 55%; margin: 10px 0 12px" />
+            <el-skeleton-item variant="text" style="width: 25%" />
+            <el-skeleton-item variant="text" style="width: 70%; margin-top: 12px" />
+          </div>
+        </div>
+        <div class="review-section">
+          <div class="section-title">
+            <el-skeleton-item variant="text" style="width: 160px" />
+          </div>
+          <div class="review-list">
+            <el-skeleton :rows="3" animated />
+          </div>
+        </div>
+      </template>
+    </el-skeleton>
+
+    <div v-else class="dish-main">
       <!-- 菜品信息 -->
       <div class="dish-hero">
         <div class="dish-media">
@@ -62,8 +94,12 @@
       <!-- 关联店铺评价 -->
       <section class="review-section">
         <h2 class="section-title">{{ dish.shop_name }} · 店铺评价</h2>
-        <div v-loading="reviewsLoading" class="review-list">
-          <el-empty v-if="!reviewsLoading && !reviews.length" description="暂无评价" />
+        <!-- 只在"没有任何评价可显示"时用骨架占位，已有列表时不再盖一层白遮罩 -->
+        <div v-if="reviewsLoading && !reviews.length" class="review-list">
+          <el-skeleton :rows="3" animated />
+        </div>
+        <div v-else class="review-list">
+          <el-empty v-if="!reviews.length" description="暂无评价" />
           <div v-for="review in reviews" :key="review.id" class="review-item">
             <el-avatar
               class="user-link"
@@ -125,7 +161,10 @@ watch(
     activeIdx.value = 0
   },
 )
-const reviewsLoading = ref(false)
+// 初始即 true：评价要等详情返回后才请求，先按"加载中"渲染，避免闪一下"暂无评价"
+const reviewsLoading = ref(true)
+// 详情请求失败（菜品不存在 / 已下架）：页面切空态而不是停在骨架屏上
+const notFound = ref(false)
 const reviews = ref([])
 const reviewTotal = ref(0)
 
@@ -137,16 +176,27 @@ const formatDate = (iso) => {
 }
 
 onMounted(async () => {
-  const detail = await dishStore.fetchDishDetail(dishId.value)
-  if (detail?.shop_id) {
-    reviewsLoading.value = true
-    try {
-      const data = await shopStore.fetchReviews(detail.shop_id, { page: 1, page_size: 3 })
-      reviews.value = data.items || []
-      reviewTotal.value = data.total || 0
-    } finally {
-      reviewsLoading.value = false
-    }
+  let detail
+  try {
+    detail = await dishStore.fetchDishDetail(dishId.value)
+  } catch (e) {
+    // 菜品不存在 / 已下架：接口层已提示，这里切空态并解除评论骨架
+    notFound.value = true
+    reviewsLoading.value = false
+    return
+  }
+  if (!detail?.shop_id) {
+    // 详情没有关联店铺（理论上不会走到）：解除骨架，交给空态文案
+    reviewsLoading.value = false
+    return
+  }
+  try {
+    // store=false：只取这 3 条预览，不写 shopStore.reviews（那是店铺详情页的完整列表）
+    const data = await shopStore.fetchReviews(detail.shop_id, { page: 1, page_size: 3 }, { store: false })
+    reviews.value = data.items || []
+    reviewTotal.value = data.total || 0
+  } finally {
+    reviewsLoading.value = false
   }
 })
 </script>
@@ -157,6 +207,18 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 24px 20px 48px;
   min-height: 60vh;
+}
+/* 空态：与详情卡同一套外观（白底卡片），页面不至于只是一片空白 */
+.not-found {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
+}
+/* 骨架屏：容器类复用真实布局（dish-hero / dish-info / review-section），这里只补封面尺寸 */
+.skeleton-cover {
+  flex: 0 0 320px;
+  height: 200px;
+  border-radius: 12px;
 }
 .page-head {
   margin-bottom: 16px;

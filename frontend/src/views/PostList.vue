@@ -29,16 +29,43 @@
       />
     </div>
 
-    <div v-loading="postStore.loading" class="post-grid">
-      <PostCard v-for="post in postStore.postList" :key="post.id" :post="post" />
+    <!-- 换排序 / 翻页 / 搜索时旧卡片原地留着，等新数据回来直接替换（不铺骨架也不盖白遮罩）；
+         只有"第一次进来"或"换了一份列表"（我的笔记↔全部、换学校）才铺骨架 -->
+    <div class="post-grid">
+      <template v-if="postStore.loading && !postStore.postList.length">
+        <!-- 外层用 el-skeleton（不只是 el-skeleton-item）才能拿到动效：渐变动画挂在 is-animated 根节点上 -->
+        <el-skeleton v-for="i in 6" :key="`post-skeleton-${i}`" animated class="skeleton-card">
+          <template #template>
+            <div class="skeleton-head">
+              <el-skeleton-item variant="circle" class="skeleton-avatar" />
+              <div class="skeleton-author">
+                <el-skeleton-item variant="text" style="width: 40%" />
+                <el-skeleton-item variant="text" style="width: 65%; margin-top: 6px" />
+              </div>
+            </div>
+            <el-skeleton-item variant="h3" style="width: 70%" />
+            <el-skeleton-item variant="text" style="width: 100%; margin: 10px 0 4px" />
+            <el-skeleton-item variant="text" style="width: 85%" />
+            <el-skeleton-item variant="image" class="skeleton-cover" />
+            <div class="skeleton-foot">
+              <el-skeleton-item variant="text" style="width: 70px" />
+              <el-skeleton-item variant="text" style="width: 90px" />
+            </div>
+          </template>
+        </el-skeleton>
+      </template>
+      <template v-else>
+        <PostCard v-for="post in postStore.postList" :key="post.id" :post="post" />
+      </template>
     </div>
     <el-empty
       v-if="!postStore.loading && !postStore.postList.length"
       :description="isMine ? '你还没有发布笔记' : '还没有笔记，来发布第一篇吧'"
     />
 
+    <!-- 列表为空（首次进入 / 换筛选条件）时先不显示分页：此时 pagination 还是上一份查询的 -->
     <Pagination
-      v-if="postStore.pagination.total_pages > 1"
+      v-if="postStore.postList.length && postStore.pagination.total_pages > 1"
       :current-page="postStore.pagination.page"
       :total-pages="postStore.pagination.total_pages"
       :total="postStore.pagination.total"
@@ -48,7 +75,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { EditPen, Search, Shop } from '@element-plus/icons-vue'
@@ -82,6 +109,10 @@ const loadList = async (page = 1) => {
 }
 
 const handleChange = () => loadList(1)
+
+// /posts ←→ /posts?mine=1 只是 query 变化，组件实例会被复用、不会重新挂载：
+// 不重新拉列表的话，两种模式的标题变了、列表却还是对方的数据
+watch(isMine, () => loadList(1))
 
 const handleCreate = () => {
   if (!userStore.isLoggedIn) {
@@ -134,5 +165,42 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;
   min-height: 120px;
+}
+/* 骨架卡片：按 PostCard 的尺寸复刻（同一套圆角/内边距，封面同为 150px），
+   单独定义而不复用 .post-card，免得占位块也带悬停上浮 */
+.skeleton-card {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  padding: 16px 18px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-author {
+  flex: 1;
+  min-width: 0;
+}
+.skeleton-cover {
+  height: 150px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+.skeleton-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
 }
 </style>
