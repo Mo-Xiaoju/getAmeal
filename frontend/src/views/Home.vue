@@ -23,15 +23,12 @@
                 <el-icon class="school-icon"><School /></el-icon>
                 <span class="school-name">{{ schoolStore.currentSchool.name }}</span>
               </template>
-              <template v-else>
-                <span class="school-tip">选择你的学校，浏览专属美食</span>
-                <el-button type="primary" size="large" @click="router.push('/choose-school')">选择学校</el-button>
-              </template>
+              <span v-else class="school-tip">选择你的学校，浏览专属美食</span>
             </div>
 
-            <div v-if="userStore.isMerchant || !userStore.isLoggedIn" class="hero-actions">
+            <!-- 未登录访客的首屏入口已去掉（导航栏常驻登录/注册/选校），首屏只做展示 -->
+            <div v-if="userStore.isMerchant" class="hero-actions">
               <el-button
-                v-if="userStore.isMerchant"
                 type="primary"
                 size="large"
                 :icon="Plus"
@@ -39,10 +36,6 @@
               >
                 发布店铺 / 管理菜单
               </el-button>
-              <template v-else>
-                <el-button type="primary" size="large" @click="router.push('/register')">立即注册</el-button>
-                <el-button size="large" @click="router.push('/login')">登录</el-button>
-              </template>
             </div>
           </div>
         </el-carousel-item>
@@ -96,11 +89,31 @@
         <h2 class="section-title">{{ schoolStore.currentSchool.name }} · 推荐店铺</h2>
         <el-button text type="primary" @click="router.push('/shops')">查看全部 →</el-button>
       </div>
-      <div v-loading="shopStore.loading" class="shop-grid">
-        <ShopCard v-for="shop in shopStore.recommendList" :key="shop.id" :shop="shop" />
+      <!-- 推荐区三栏统一做法：加载中且还没有数据时用骨架卡片占位（避免"空白闪一下 → 卡片整块冒出"），
+           已有数据时直接渲染 —— 从详情页返回首页不会重新白一次，只在原地刷新 -->
+      <div class="shop-grid">
+        <template v-if="shopStore.recommendLoading && !shopStore.recommendList.length">
+          <el-skeleton
+            v-for="i in 4"
+            :key="`shop-skeleton-${i}`"
+            animated
+            class="skeleton-card"
+          >
+            <template #template>
+              <el-skeleton-item variant="image" class="skeleton-card-cover" />
+              <div class="skeleton-card-body">
+                <el-skeleton-item variant="text" style="width: 70%" />
+                <el-skeleton-item variant="text" style="width: 45%; margin-top: 8px" />
+              </div>
+            </template>
+          </el-skeleton>
+        </template>
+        <template v-else>
+          <ShopCard v-for="shop in shopStore.recommendList" :key="shop.id" :shop="shop" />
+        </template>
       </div>
       <el-empty
-        v-if="!shopStore.loading && !shopStore.recommendList.length"
+        v-if="!shopStore.recommendLoading && !shopStore.recommendList.length"
         description="暂无推荐店铺"
       />
     </section>
@@ -110,11 +123,29 @@
       <div class="recommend-head">
         <h2 class="section-title">{{ schoolStore.currentSchool.name }} · 热门菜品</h2>
       </div>
-      <div v-loading="dishStore.loading" class="dish-grid">
-        <DishCard v-for="d in dishStore.recommendList" :key="d.id" :dish="d" />
+      <div class="dish-grid">
+        <template v-if="dishStore.recommendLoading && !dishStore.recommendList.length">
+          <el-skeleton
+            v-for="i in 6"
+            :key="`dish-skeleton-${i}`"
+            animated
+            class="skeleton-card"
+          >
+            <template #template>
+              <el-skeleton-item variant="image" class="skeleton-card-cover" />
+              <div class="skeleton-card-body">
+                <el-skeleton-item variant="text" style="width: 70%" />
+                <el-skeleton-item variant="text" style="width: 40%; margin-top: 8px" />
+              </div>
+            </template>
+          </el-skeleton>
+        </template>
+        <template v-else>
+          <DishCard v-for="d in dishStore.recommendList" :key="d.id" :dish="d" />
+        </template>
       </div>
       <el-empty
-        v-if="!dishStore.loading && !dishStore.recommendList.length"
+        v-if="!dishStore.recommendLoading && !dishStore.recommendList.length"
         description="暂无热门菜品"
       />
     </section>
@@ -125,8 +156,37 @@
         <h2 class="section-title">{{ schoolStore.currentSchool.name }} · 推荐探店笔记</h2>
         <el-button text type="primary" @click="router.push('/posts')">查看全部 →</el-button>
       </div>
-      <div v-loading="postStore.loading" class="post-grid">
-        <PostCard v-for="post in postStore.postList" :key="post.id" :post="post" />
+      <!-- 笔记骨架按 PostCard 复刻（头像行 / 标题 / 两行正文 / 150px 封面 / 数据栏贴底） -->
+      <div class="post-grid">
+        <template v-if="postStore.loading && !postStore.postList.length">
+          <el-skeleton
+            v-for="i in 3"
+            :key="`post-skeleton-${i}`"
+            animated
+            class="skeleton-card skeleton-post"
+          >
+            <template #template>
+              <div class="skeleton-head">
+                <el-skeleton-item variant="circle" class="skeleton-avatar" />
+                <div class="skeleton-author">
+                  <el-skeleton-item variant="text" style="width: 40%" />
+                  <el-skeleton-item variant="text" style="width: 65%; margin-top: 6px" />
+                </div>
+              </div>
+              <el-skeleton-item variant="h3" style="width: 70%" />
+              <el-skeleton-item variant="text" style="width: 100%; margin: 10px 0 4px" />
+              <el-skeleton-item variant="text" style="width: 85%" />
+              <el-skeleton-item variant="image" class="skeleton-cover" />
+              <div class="skeleton-foot">
+                <el-skeleton-item variant="text" style="width: 70px" />
+                <el-skeleton-item variant="text" style="width: 90px" />
+              </div>
+            </template>
+          </el-skeleton>
+        </template>
+        <template v-else>
+          <PostCard v-for="post in postStore.postList" :key="post.id" :post="post" />
+        </template>
       </div>
       <el-empty
         v-if="!postStore.loading && !postStore.postList.length"
@@ -364,7 +424,6 @@ onUnmounted(() => cancelAnimationFrame(rafId))
 .school-tip {
   font-size: 15px;
   color: #606266;
-  margin-right: 8px;
 }
 .hero-actions {
   display: flex;
@@ -462,5 +521,52 @@ onUnmounted(() => cancelAnimationFrame(rafId))
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;
+}
+/* 骨架屏：店铺/菜品骨架按 ShopCard、DishCard 复刻（封面同为 150px、圆角与内边距一致） */
+.skeleton-card {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.skeleton-card-cover {
+  height: 150px;
+}
+.skeleton-card-body {
+  padding: 14px 16px 16px;
+  flex: 1;
+}
+/* 笔记骨架：卡片是竖排的（头像行 → 标题 → 正文 → 封面 → 数据栏），单独一套 */
+.skeleton-post {
+  padding: 16px 18px;
+}
+.skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.skeleton-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skeleton-author {
+  flex: 1;
+  min-width: 0;
+}
+.skeleton-cover {
+  height: 150px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+.skeleton-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
 }
 </style>

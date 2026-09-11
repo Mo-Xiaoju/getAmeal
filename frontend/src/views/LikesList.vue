@@ -8,8 +8,10 @@
       <div v-for="item in items" :key="item.id" class="like-item">
         <PostCard :post="item.post" />
         <div class="item-actions">
+          <!-- 点赞用大拇指（星星留给收藏 / 评分），与卡片和详情页同一枚图标；
+               这页列的都是"已点赞"，所以用实心款，和列表里卡片上的状态图标对得上 -->
           <el-button text type="danger" size="small" @click="unlike(item)">
-            <el-icon><StarFilled /></el-icon>取消点赞
+            <el-icon><ThumbUpIcon filled /></el-icon>取消点赞
           </el-button>
         </div>
       </div>
@@ -30,8 +32,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { StarFilled } from '@element-plus/icons-vue'
-
+import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
 import Pagination from '@/components/Pagination.vue'
 import PostCard from '@/components/PostCard.vue'
 import { getMyLikes } from '@/api/user'

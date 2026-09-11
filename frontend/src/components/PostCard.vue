@@ -32,9 +32,15 @@
       <div v-if="post.tags && post.tags.length" class="post-tags">
         <el-tag v-for="t in post.tags.slice(0, 3)" :key="t" size="small" effect="plain">{{ t }}</el-tag>
       </div>
+      <!-- 点赞用大拇指、收藏用五角星：两个都曾是星星，混在一排里分不清哪个是哪个。
+           已点赞 / 已收藏除了整格变色（红 / 黄，与详情页按钮同色），图标也从描边变实心 -->
       <div class="post-stats">
-        <span><el-icon><StarFilled /></el-icon>{{ post.like_count || 0 }}</span>
-        <span><el-icon><Star /></el-icon>{{ post.favorite_count || 0 }}</span>
+        <span :class="{ 'is-liked': post.liked }">
+          <el-icon><ThumbUpIcon :filled="!!post.liked" /></el-icon>{{ post.like_count || 0 }}
+        </span>
+        <span :class="{ 'is-favorited': post.favorited }">
+          <el-icon><StarIcon :filled="!!post.favorited" /></el-icon>{{ post.favorite_count || 0 }}
+        </span>
         <span><el-icon><ChatDotRound /></el-icon>{{ post.comment_count || 0 }}</span>
       </div>
     </div>
@@ -44,8 +50,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, Star, StarFilled } from '@element-plus/icons-vue'
+import { ChatDotRound } from '@element-plus/icons-vue'
 
+import StarIcon from '@/components/StarIcon.vue'
+import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
 import { openImage } from '@/composables/useImageViewer'
 import { useUserNav } from '@/composables/useUserNav'
 
@@ -174,5 +182,12 @@ const goDetail = () => {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+/* 已点赞 / 已收藏：整格（图标 + 数字）跟着变色，取值与详情页按钮的按钮类型一致（danger / warning） */
+.post-stats span.is-liked {
+  color: var(--el-color-danger);
+}
+.post-stats span.is-favorited {
+  color: var(--el-color-warning);
 }
 </style>

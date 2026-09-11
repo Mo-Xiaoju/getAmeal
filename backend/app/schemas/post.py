@@ -4,7 +4,43 @@ import json
 from flask import g
 from marshmallow import EXCLUDE, Schema, fields
 
-from app.models import Like, UserFollow
+from app.models import Favorite, Like, UserFollow
+
+
+def _liked_post_ids() -> set:
+    """当前登录用户已点赞的笔记 id 集合。
+
+    列表卡片也要按"我点过赞没有"上色，逐条查库在列表页就是 N 次查询，
+    所以这里一次取完、并在本次请求内缓存（g 是请求级的，不会跨请求串数据）。
+    """
+    ids = getattr(g, 'liked_post_ids', None)
+    if ids is None:
+        user = getattr(g, 'current_user', None)
+        ids = (
+            {row[0] for row in Like.query.with_entities(Like.post_id).filter_by(user_id=user.id)}
+            if user is not None
+            else set()
+        )
+        g.liked_post_ids = ids
+    return ids
+
+
+def _favorited_post_ids() -> set:
+    """当前登录用户已收藏的笔记 id 集合（同上；shop_id 为空的是收藏店铺，跳过）。"""
+    ids = getattr(g, 'favorited_post_ids', None)
+    if ids is None:
+        user = getattr(g, 'current_user', None)
+        ids = (
+            {
+                row[0]
+                for row in Favorite.query.with_entities(Favorite.post_id).filter_by(user_id=user.id)
+                if row[0] is not None
+            }
+            if user is not None
+            else set()
+        )
+        g.favorited_post_ids = ids
+    return ids
 
 
 class PostSchema(Schema):
@@ -23,6 +59,15 @@ class PostSchema(Schema):
     comment_count = fields.Int()
     created_at = fields.DateTime()
     author = fields.Method('_author')
+    # 当前登录用户视角的互动状态：列表卡片要按状态上色（已点赞 / 已收藏），详情页复用同一对字段
+    liked = fields.Method('_liked')
+    favorited = fields.Method('_favorited')
+
+    def _liked(self, obj) -> bool:
+        return obj.id in _liked_post_ids()
+
+    def _favorited(self, obj) -> bool:
+        return obj.id in _favorited_post_ids()
 
     def _images(self, obj) -> list:
         try:
@@ -43,24 +88,9 @@ class PostSchema(Schema):
 
 
 class PostDetailSchema(PostSchema):
-    """笔记详情：在列表项基础上扩展登录用户视角状态。"""
+    """笔记详情：在列表项基础上扩展登录用户视角状态（liked / favorited 继承自列表项）。"""
 
-    liked = fields.Method('_liked')
-    favorited = fields.Method('_favorited')
     is_following = fields.Method('_is_following')
-
-    def _liked(self, obj) -> bool:
-        user = getattr(g, 'current_user', None)
-        if user is None:
-            return False
-        return Like.query.filter_by(user_id=user.id, post_id=obj.id).first() is not None
-
-    def _favorited(self, obj) -> bool:
-        from app.models import Favorite
-        user = getattr(g, 'current_user', None)
-        if user is None:
-            return False
-        return Favorite.query.filter_by(user_id=user.id, post_id=obj.id).first() is not None
 
     def _is_following(self, obj) -> bool:
         user = getattr(g, 'current_user', None)

@@ -1,7 +1,50 @@
 <template>
-  <div v-loading="shopStore.loading" class="shop-detail">
+  <div class="shop-detail">
+    <!-- 与菜品/笔记详情页一致的返回头：可以从店铺卡片、笔记关联、菜品「在售于」等多处进来 -->
+    <div class="page-head">
+      <el-page-header content="店铺详情" @back="router.back()" />
+    </div>
+
+    <!-- 详情拿不到（店铺不存在 / 已下架）：骨架屏不能一直转下去，给明确空态与返回入口 -->
+    <div v-if="notFound" class="not-found">
+      <el-empty description="店铺不存在或已下架">
+        <el-button type="primary" plain @click="router.push('/shops')">返回店铺列表</el-button>
+      </el-empty>
+    </div>
+
+    <!-- 首次进入 / 切换店铺时先渲染骨架：避免"空白 → 整页白遮罩闪一下 → 内容整块冒出"。
+         返回同一家店时 store 里已有该店数据（fetchShopDetail 不清），直接渲染，不经过骨架 -->
+    <el-skeleton v-else-if="!shopStore.shopDetail" animated>
+      <template #template>
+        <!-- 容器复用真实布局的类（shop-hero / dish-grid），保证骨架与内容同形、高度一致 -->
+        <div class="shop-hero">
+          <el-skeleton-item variant="image" class="skeleton-cover" />
+          <div class="shop-info">
+            <el-skeleton-item variant="text" style="width: 40%" />
+            <el-skeleton-item variant="h1" style="width: 60%; margin: 10px 0 12px" />
+            <el-skeleton-item variant="text" style="width: 30%" />
+            <el-skeleton-item variant="text" style="width: 80%; margin-top: 12px" />
+          </div>
+        </div>
+        <div class="dish-section">
+          <div class="section-title">
+            <el-skeleton-item variant="text" style="width: 100px" />
+          </div>
+          <div class="dish-grid">
+            <div v-for="i in 3" :key="i" class="skeleton-card">
+              <el-skeleton-item variant="image" class="skeleton-card-cover" />
+              <div class="skeleton-card-body">
+                <el-skeleton-item variant="text" style="width: 70%" />
+                <el-skeleton-item variant="text" style="width: 40%; margin-top: 8px" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </el-skeleton>
+
     <!-- 店铺信息 -->
-    <div v-if="shopStore.shopDetail" class="detail-main">
+    <div v-else class="detail-main">
       <div class="shop-hero">
         <div class="shop-cover">
           <img
@@ -33,12 +76,13 @@
           <div class="shop-actions">
             <!-- 学生/游客/管理员：收藏 + 写评价（商户不开放，后端 4031） -->
             <template v-if="!userStore.isMerchant">
+              <!-- 收藏 = 五角星（全站统一）：未收藏描边、已收藏实心，与笔记详情的收藏按钮同一枚图标 -->
               <el-button
                 :type="shopStore.isFavorited ? 'warning' : 'primary'"
                 :plain="!shopStore.isFavorited"
-                :icon="shopStore.isFavorited ? StarFilled : Star"
                 @click="handleFavorite"
               >
+                <el-icon><StarIcon :filled="!!shopStore.isFavorited" /></el-icon>
                 {{ shopStore.isFavorited ? '已收藏' : '收藏店铺' }}
               </el-button>
               <el-button type="success" plain :icon="EditPen" @click="scrollToReview">写评价</el-button>
@@ -57,8 +101,28 @@
     <!-- 本店菜品 -->
     <section v-if="shopStore.shopDetail" class="dish-section">
       <h2 class="section-title">本店菜品</h2>
-      <div v-loading="dishStore.loading" class="dish-grid">
-        <DishCard v-for="d in dishStore.shopDishes" :key="d.id" :dish="d" />
+      <div class="dish-grid">
+        <!-- 本店菜品还没回来时用骨架卡片占位（与整页骨架同形，不会跳高）；已有本店菜品则直接渲染 -->
+        <template v-if="dishStore.loading && !dishStore.shopDishes.length">
+          <!-- 外层用 el-skeleton（不只是 el-skeleton-item）才能拿到动效：动画挂在 is-animated 根节点上 -->
+          <el-skeleton
+            v-for="i in 3"
+            :key="`dish-skeleton-${i}`"
+            animated
+            class="skeleton-card"
+          >
+            <template #template>
+              <el-skeleton-item variant="image" class="skeleton-card-cover" />
+              <div class="skeleton-card-body">
+                <el-skeleton-item variant="text" style="width: 70%" />
+                <el-skeleton-item variant="text" style="width: 40%; margin-top: 8px" />
+              </div>
+            </template>
+          </el-skeleton>
+        </template>
+        <template v-else>
+          <DishCard v-for="d in dishStore.shopDishes" :key="d.id" :dish="d" />
+        </template>
       </div>
       <el-empty
         v-if="!dishStore.loading && !dishStore.shopDishes.length"
@@ -70,8 +134,8 @@
       </el-empty>
     </section>
 
-    <!-- 评价区 -->
-    <div class="review-section" ref="reviewSection">
+    <!-- 评价区：随详情一起出现，避免详情未到位时空表单先渲染 -->
+    <div v-if="shopStore.shopDetail" class="review-section" ref="reviewSection">
       <!-- 商户不开放写评价（后端 4031），仅保留评价浏览 -->
       <template v-if="!userStore.isMerchant">
         <h2 class="section-title">发表评价</h2>
@@ -95,9 +159,14 @@
       </template>
 
       <h2 class="section-title">全部评价</h2>
-      <div v-loading="reviewsLoading" class="review-list">
+      <!-- 列表为空时才用骨架占位：store 里的 reviews 在换店时已被 fetchShopDetail 清掉，
+           所以"非空"必然属于本店；返回同一家店时直接复用，不闪骨架也不盖白遮罩 -->
+      <div v-if="reviewsLoading && !shopStore.reviews.length" class="review-list">
+        <el-skeleton :rows="3" animated />
+      </div>
+      <div v-else class="review-list">
         <el-empty
-          v-if="!reviewsLoading && !shopStore.reviews.length"
+          v-if="!shopStore.reviews.length"
           description="还没有评价，来发表第一条吧"
         />
         <div v-for="review in shopStore.reviews" :key="review.id" class="review-item">
@@ -162,7 +231,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { EditPen, Food, Location, Plus, Shop, Star, StarFilled } from '@element-plus/icons-vue'
+import { EditPen, Food, Location, Plus, Shop } from '@element-plus/icons-vue'
+
+import StarIcon from '@/components/StarIcon.vue'
 
 import { submitDish } from '@/api/contribute'
 import DishCard from '@/components/DishCard.vue'
@@ -184,7 +255,10 @@ const dishStore = useDishStore()
 
 const shopId = computed(() => Number(route.params.id))
 const imageFailed = ref(false)
-const reviewsLoading = ref(false)
+// 详情请求失败（店铺不存在 / 已下架）：页面切空态而不是停在骨架屏上
+const notFound = ref(false)
+// 初始即 true：挂载后立刻要拉评价，先按"加载中"渲染，避免闪一下空态文案
+const reviewsLoading = ref(true)
 const submitting = ref(false)
 const reviewSection = ref(null)
 const reviewPagination = reactive({ page: 1, page_size: 10, total: 0, total_pages: 0 })
@@ -311,8 +385,15 @@ const handleSubmit = async () => {
   }
 }
 
-onMounted(() => {
-  shopStore.fetchShopDetail(shopId.value)
+onMounted(async () => {
+  try {
+    await shopStore.fetchShopDetail(shopId.value)
+  } catch (e) {
+    // 店铺不存在 / 已下架：接口层已提示，这里只切空态，
+    // 也不再发菜品与评价请求（两个区块本来就等详情出来才渲染）
+    notFound.value = true
+    return
+  }
   dishStore.fetchShopDishes(shopId.value)
   loadReviews(1)
 })
@@ -324,6 +405,15 @@ onMounted(() => {
   margin: 0 auto;
   padding: 24px 20px 48px;
   min-height: 60vh;
+}
+.page-head {
+  margin-bottom: 16px;
+}
+/* 空态：与详情卡同一套外观（白底卡片），页面不至于只是一片空白 */
+.not-found {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 16px;
 }
 .shop-hero {
   display: flex;
@@ -405,6 +495,24 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+}
+/* 骨架屏：容器类复用真实布局（shop-hero / shop-info / dish-grid），这里只补封面与菜品卡的自身尺寸 */
+.skeleton-cover {
+  flex: 0 0 320px;
+  height: 200px;
+  border-radius: 12px;
+}
+.skeleton-card {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.skeleton-card-cover {
+  height: 150px;
+}
+.skeleton-card-body {
+  padding: 12px;
 }
 .review-section {
   margin-top: 28px;
