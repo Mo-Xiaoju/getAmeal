@@ -14,6 +14,7 @@
           <div v-else class="cover-fallback">
             <el-icon><Food /></el-icon>
           </div>
+          <ZoneRibbon :zone="shop.zone" />
         </div>
         <div class="shop-info">
           <div class="shop-tags">
@@ -171,6 +172,7 @@ import { openImage } from '@/composables/useImageViewer'
 import { useUserNav } from '@/composables/useUserNav'
 import Pagination from '@/components/Pagination.vue'
 import RatingStars from '@/components/RatingStars.vue'
+import ZoneRibbon from '@/components/ZoneRibbon.vue'
 import { useDishStore } from '@/store/dish'
 import { useShopStore } from '@/store/shop'
 import { useUserStore } from '@/store/user'
@@ -334,6 +336,7 @@ onMounted(() => {
   padding: 20px;
 }
 .shop-cover {
+  position: relative; /* 角标锚点 */
   flex: 0 0 320px;
   height: 200px;
   border-radius: 12px;

@@ -1,7 +1,7 @@
 """商户中心业务逻辑：商户管理自己的店铺与菜单（仅限本人的店铺/菜品）。"""
 from sqlalchemy import and_, or_
 
-from app.categories import normalize_category_payload
+from app.categories import normalize_shop_payload
 from app.extensions import db
 from app.models import Dish, Shop, User
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
@@ -134,7 +134,7 @@ class MerchantService:
     def create_shop(user, data: dict) -> dict:
         """新增店铺（商户创建即 approved，无需审核）。"""
         data = ShopCreateSchema().load(data)
-        data = normalize_category_payload(data)
+        data = normalize_shop_payload(data)
         _validate_unique_shop_name(data['name'])
         shop = Shop(**data, owner_id=user.id, status='approved')
         db.session.add(shop)
@@ -154,7 +154,7 @@ class MerchantService:
         """修改自己的店铺信息（商户本人维护的内容直接发布，无需再审核）。"""
         shop = _get_owned_shop(user, shop_id)
         data = ShopUpdateSchema().load(data)
-        data = normalize_category_payload(data)
+        data = normalize_shop_payload(data)
         for key, value in data.items():
             if value is not None:
                 setattr(shop, key, value)

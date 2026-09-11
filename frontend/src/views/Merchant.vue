@@ -73,6 +73,11 @@
         <el-form-item label="地址" required>
           <el-input v-model="shopDialog.form.address" maxlength="200" placeholder="例如：校园内学三食堂一楼" />
         </el-form-item>
+        <el-form-item label="大分类" required>
+          <el-select v-model="shopDialog.form.zone" placeholder="请选择大分类（校内/周边/外卖）" style="width: 100%">
+            <el-option v-for="z in categoryStore.zones" :key="z" :label="z" :value="z" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="分类">
           <el-select v-model="shopDialog.form.category" placeholder="请选择分类" clearable style="width: 100%">
             <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
@@ -226,6 +231,7 @@ const emptyShopForm = () => ({
   name: '',
   address: '',
   category: '',
+  zone: '',
   price_range: '',
   description: '',
   image_url: '',
@@ -257,12 +263,17 @@ const handleSaveShop = async () => {
     ElMessage.warning('店铺名称和地址不能为空')
     return
   }
+  if (!form.zone) {
+    ElMessage.warning('请选择大分类（校内/周边/外卖）')
+    return
+  }
   saving.value = true
   try {
     const payload = {
       name: form.name.trim(),
       address: form.address.trim(),
       category: form.category?.trim() || undefined,
+      zone: form.zone || undefined,
       price_range: form.price_range?.trim() || undefined,
       description: form.description?.trim() || undefined,
       // '' 可清除已存封面（后端 update 仅在值非 None 时 setattr）
@@ -408,6 +419,7 @@ const handleDeleteDish = async (dish) => {
 onMounted(() => {
   if (!schoolStore.schoolList.length) schoolStore.fetchSchools()
   if (!categoryStore.categories.length) categoryStore.fetchCategories()
+  if (!categoryStore.zones.length) categoryStore.fetchZones()
   loadShops()
 })
 </script>

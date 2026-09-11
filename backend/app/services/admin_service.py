@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import case, func
 
+from app.categories import coerce_zone
 from app.extensions import db
 from app.models import Dish, EventLog, School, Shop, User
 from app.services.event_log_service import EventLogService
@@ -41,6 +42,7 @@ def _shop_admin_view(shop: Shop) -> dict:
         'longitude': shop.longitude,
         'latitude': shop.latitude,
         'category': shop.category,
+        'zone': shop.zone,
         'price_range': shop.price_range,
         'avg_rating': round(shop.avg_rating or 0.0, 2),
         'rating_count': shop.rating_count,
@@ -125,6 +127,7 @@ class AdminService:
             address=(data.get('address') or '').strip() or '待定',
             description=(data.get('description') or '').strip() or None,
             category=(data.get('category') or '').strip() or None,
+            zone=coerce_zone(data.get('zone')),
             price_range=(data.get('price_range') or '').strip() or None,
             longitude=data.get('longitude'),
             latitude=data.get('latitude'),
@@ -158,6 +161,10 @@ class AdminService:
         for field in ('longitude', 'latitude'):
             if field in data:
                 setattr(shop, field, data[field])
+
+        # zone 单独走校验（不并入上面的裸 setattr 白名单，避免绕过词表写入任意字符串）
+        if 'zone' in data:
+            shop.zone = coerce_zone(data['zone'])
 
         if 'is_active' in data:
             shop.is_active = bool(data['is_active'])

@@ -90,6 +90,12 @@
               <template #default="{ row }">{{ row.school_name || '-' }}</template>
             </el-table-column>
             <el-table-column prop="category" label="分类" width="100" />
+            <el-table-column label="大分类" width="90">
+              <!-- 「未设置」即迁移时未回填的存量店，是管理员需要补值的待办清单 -->
+              <template #default="{ row }">
+                <span :class="{ 'zone-missing': !row.zone }">{{ row.zone || '未设置' }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="price_range" label="人均" width="100" />
             <el-table-column prop="avg_rating" label="评分" width="80" />
             <el-table-column label="状态" width="100">
@@ -143,6 +149,11 @@
         <el-form-item label="地址" required>
           <el-input v-model="shopForm.address" placeholder="请输入地址" />
         </el-form-item>
+        <el-form-item label="大分类">
+          <el-select v-model="shopForm.zone" placeholder="请选择（校内/周边/外卖）" clearable style="width: 100%">
+            <el-option v-for="z in categoryStore.zones" :key="z" :label="z" :value="z" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="分类">
           <el-input v-model="shopForm.category" placeholder="如：食堂、奶茶、火锅" />
         </el-form-item>
@@ -178,12 +189,14 @@ import {
   updateShop,
   deleteShop,
 } from '@/api/admin'
+import { useCategoryStore } from '@/store/category'
 import { useUserStore } from '@/store/user'
 
 import AuditQueue from './AuditQueue.vue'
 import AdminStats from './AdminStats.vue'
 
 const userStore = useUserStore()
+const categoryStore = useCategoryStore()
 const adminTab = ref('users')
 
 // ========== 标签页 ==========
@@ -208,6 +221,7 @@ const shopForm = ref({
   address: '',
   description: '',
   category: '',
+  zone: '',
   price_range: '',
   image_url: '',
 })
@@ -287,6 +301,7 @@ const openShopDialog = (row = null) => {
       address: '',
       description: '',
       category: '',
+      zone: '',
       price_range: '',
       image_url: '',
     }
@@ -329,6 +344,7 @@ const handleDeleteShop = async (row) => {
 }
 
 onMounted(() => {
+  if (!categoryStore.zones.length) categoryStore.fetchZones()
   loadUsers(1)
   loadShops(1)
 })
@@ -381,5 +397,8 @@ onMounted(() => {
 }
 .admin-tabs {
   margin-top: 4px;
+}
+.zone-missing {
+  color: #c0c4cc;
 }
 </style>

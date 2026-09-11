@@ -16,6 +16,7 @@
         <el-icon><Food /></el-icon>
       </div>
       <el-tag v-if="shop.category" class="category-tag" effect="light">{{ shop.category }}</el-tag>
+      <ZoneRibbon :zone="shop.zone" />
     </div>
 
     <div class="shop-info">
@@ -44,6 +45,7 @@ import { useRouter } from 'vue-router'
 import { Food, Location } from '@element-plus/icons-vue'
 
 import RatingStars from '@/components/RatingStars.vue'
+import ZoneRibbon from '@/components/ZoneRibbon.vue'
 
 import { openImage } from '@/composables/useImageViewer'
 

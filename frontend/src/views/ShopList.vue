@@ -25,6 +25,9 @@
       <el-select v-model="filters.category" placeholder="全部分类" clearable style="width: 140px" @change="handleSearch">
         <el-option v-for="c in categoryStore.categories" :key="c" :label="c" :value="c" />
       </el-select>
+      <el-select v-model="filters.zone" placeholder="全部位置" clearable style="width: 120px" @change="handleSearch">
+        <el-option v-for="z in categoryStore.zones" :key="z" :label="z" :value="z" />
+      </el-select>
       <el-select v-model="filters.sort" placeholder="排序" style="width: 130px" @change="handleSearch">
         <el-option label="评分最高" value="rating" />
         <el-option label="最新上架" value="newest" />
@@ -67,6 +70,7 @@ const categoryStore = useCategoryStore()
 const filters = reactive({
   keyword: '',
   category: '',
+  zone: '',
   sort: 'rating',
   page: 1,
 })
@@ -79,6 +83,7 @@ const loadShops = async () => {
   }
   if (filters.keyword.trim()) params.keyword = filters.keyword.trim()
   if (filters.category) params.category = filters.category
+  if (filters.zone) params.zone = filters.zone
   if (schoolStore.hasSchool) params.school_id = schoolStore.currentSchool.id
   await shopStore.fetchShopList(params)
 }
@@ -98,6 +103,7 @@ onMounted(async () => {
     await schoolStore.fetchSchools()
   }
   if (!categoryStore.categories.length) categoryStore.fetchCategories()
+  if (!categoryStore.zones.length) categoryStore.fetchZones()
   loadShops()
 })
 </script>

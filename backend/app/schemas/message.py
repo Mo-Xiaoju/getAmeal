@@ -36,6 +36,7 @@ class MessageSchema(Schema):
             'name': shop.name,
             'image_url': shop.image_url,
             'category': shop.category,
+            'zone': shop.zone,
         }
 
     def _channel(self, obj) -> dict:

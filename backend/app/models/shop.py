@@ -17,6 +17,8 @@ class Shop(db.Model):
     longitude = db.Column(db.Float, nullable=True)                        # 经度（用于距离推荐）
     latitude = db.Column(db.Float, nullable=True)                         # 纬度
     category = db.Column(db.String(50), nullable=True)                    # 分类：川菜/快餐/奶茶…
+    # 大分类：校内/周边/外卖，见 app.categories.ZONES。可空——未设置时前端不渲染角标
+    zone = db.Column(db.String(20), nullable=True)
     price_range = db.Column(db.String(20), nullable=True)                 # 人均区间：如 "10-20元"
     avg_rating = db.Column(db.Float, nullable=False, default=0.0)         # 平均评分
     rating_count = db.Column(db.Integer, nullable=False, default=0)       # 评分人数

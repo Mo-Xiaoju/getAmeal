@@ -8,7 +8,7 @@
 """
 from sqlalchemy import func, or_
 
-from app.categories import normalize_category_payload
+from app.categories import normalize_shop_payload
 from app.extensions import db
 from app.models import Dish, Shop
 from app.schemas.dish import DishCreateSchema, DishSchema, DishUpdateSchema
@@ -159,7 +159,7 @@ class ContributeService:
     def create_shop(user, data: dict) -> dict:
         """提交新店铺（status=pending，待审核）。"""
         data = ShopCreateSchema().load(data)
-        data = normalize_category_payload(data)
+        data = normalize_shop_payload(data)
         _validate_unique_shop_name(data['name'])
         shop = Shop(**data, owner_id=user.id, status='pending')
         db.session.add(shop)
@@ -179,7 +179,7 @@ class ContributeService:
         """修改本人提交的店铺：编辑后回到待审核（approved 亦重新审核）。"""
         shop = _get_owned_shop(user, shop_id)
         data = ShopUpdateSchema().load(data)
-        data = normalize_category_payload(data)
+        data = normalize_shop_payload(data)
         name = data.get('name')
         if name is not None:
             name = name.strip()

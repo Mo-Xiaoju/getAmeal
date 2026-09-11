@@ -2,7 +2,7 @@
 import json
 import math
 
-from app.categories import canonicalize
+from app.categories import canonicalize, canonicalize_zone
 from app.extensions import db
 from app.models import Favorite, Review, Shop
 from app.schemas.shop import ReviewSchema, ShopDetailSchema, ShopSchema
@@ -41,7 +41,7 @@ class ShopService:
     # ---- 列表与详情 ----
     @staticmethod
     def list_shops(params: dict) -> dict:
-        """店铺列表：school_id / keyword / category 筛选 + 排序 + 分页。"""
+        """店铺列表：school_id / keyword / category / zone 筛选 + 排序 + 分页。"""
         query = Shop.query.filter_by(is_active=True, status='approved')
 
         school_id = params.get('school_id')
@@ -55,6 +55,10 @@ class ShopService:
         category = canonicalize(params.get('category'))
         if category:
             query = query.filter(Shop.category == category)
+
+        zone = canonicalize_zone(params.get('zone'))
+        if zone:
+            query = query.filter(Shop.zone == zone)
 
         sort = params.get('sort')
         if sort == 'newest':

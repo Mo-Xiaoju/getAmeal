@@ -52,42 +52,44 @@ def register_cli(app) -> None:
             {'name': '中山大学', 'address': '广东省广州市'},
         ]
 
+        # zone（大分类）逐店人工指定：食堂、教学楼、宿舍区归「校内」，
+        # 校门外的商业街/美食街归「周边」，以校外配送为主的归「外卖」。
         shops_data = {
             '北京大学': [
-                {'name': '北大农园食堂', 'category': '食堂', 'price_range': '10-20元', 'rating': 4.5, 'count': 128, 'address': '校园内农园路'},
-                {'name': '畅春园食堂', 'category': '食堂', 'price_range': '8-18元', 'rating': 4.2, 'count': 96, 'address': '校园内畅春园'},
-                {'name': '未名咖啡', 'category': '咖啡甜点', 'price_range': '20-40元', 'rating': 4.8, 'count': 210, 'address': '未名湖畔'},
-                {'name': '燕园小面馆', 'category': '面食', 'price_range': '12-22元', 'rating': 4.0, 'count': 54, 'address': '南门商业街'},
+                {'name': '北大农园食堂', 'category': '食堂', 'zone': '校内', 'price_range': '10-20元', 'rating': 4.5, 'count': 128, 'address': '校园内农园路'},
+                {'name': '畅春园食堂', 'category': '食堂', 'zone': '校内', 'price_range': '8-18元', 'rating': 4.2, 'count': 96, 'address': '校园内畅春园'},
+                {'name': '未名咖啡', 'category': '咖啡甜点', 'zone': '校内', 'price_range': '20-40元', 'rating': 4.8, 'count': 210, 'address': '未名湖畔'},
+                {'name': '燕园小面馆', 'category': '面食', 'zone': '周边', 'price_range': '12-22元', 'rating': 4.0, 'count': 54, 'address': '南门商业街'},
             ],
             '清华大学': [
-                {'name': '桃李园餐厅', 'category': '食堂', 'price_range': '10-20元', 'rating': 4.3, 'count': 87, 'address': '校园内桃李园'},
-                {'name': '紫荆园食堂', 'category': '食堂', 'price_range': '8-16元', 'rating': 4.1, 'count': 110, 'address': '校园内紫荆公寓区'},
-                {'name': '水木奶茶', 'category': '奶茶饮品', 'price_range': '15-25元', 'rating': 4.6, 'count': 176, 'address': '西门外商业街'},
-                {'name': '清华西点屋', 'category': '烘焙甜点', 'price_range': '18-35元', 'rating': 4.7, 'count': 98, 'address': '校园内荷清园'},
+                {'name': '桃李园餐厅', 'category': '食堂', 'zone': '校内', 'price_range': '10-20元', 'rating': 4.3, 'count': 87, 'address': '校园内桃李园'},
+                {'name': '紫荆园食堂', 'category': '食堂', 'zone': '校内', 'price_range': '8-16元', 'rating': 4.1, 'count': 110, 'address': '校园内紫荆公寓区'},
+                {'name': '水木奶茶', 'category': '奶茶饮品', 'zone': '周边', 'price_range': '15-25元', 'rating': 4.6, 'count': 176, 'address': '西门外商业街'},
+                {'name': '清华西点屋', 'category': '烘焙甜点', 'zone': '校内', 'price_range': '18-35元', 'rating': 4.7, 'count': 98, 'address': '校园内荷清园'},
             ],
             '复旦大学': [
-                {'name': '旦苑餐厅', 'category': '食堂', 'price_range': '10-20元', 'rating': 4.2, 'count': 76, 'address': '邯郸校区'},
-                {'name': '光华楼咖啡', 'category': '咖啡甜点', 'price_range': '22-45元', 'rating': 4.5, 'count': 132, 'address': '光华楼一层'},
-                {'name': '江湾小食堂', 'category': '食堂', 'price_range': '8-15元', 'rating': 3.9, 'count': 45, 'address': '江湾校区'},
-                {'name': '邯郸路生煎', 'category': '小吃', 'price_range': '10-18元', 'rating': 4.4, 'count': 89, 'address': '邯郸路商业街'},
+                {'name': '旦苑餐厅', 'category': '食堂', 'zone': '校内', 'price_range': '10-20元', 'rating': 4.2, 'count': 76, 'address': '邯郸校区'},
+                {'name': '光华楼咖啡', 'category': '咖啡甜点', 'zone': '校内', 'price_range': '22-45元', 'rating': 4.5, 'count': 132, 'address': '光华楼一层'},
+                {'name': '江湾小食堂', 'category': '食堂', 'zone': '校内', 'price_range': '8-15元', 'rating': 3.9, 'count': 45, 'address': '江湾校区'},
+                {'name': '邯郸路生煎', 'category': '小吃', 'zone': '周边', 'price_range': '10-18元', 'rating': 4.4, 'count': 89, 'address': '邯郸路商业街'},
             ],
             '浙江大学': [
-                {'name': '紫金港食堂', 'category': '食堂', 'price_range': '9-18元', 'rating': 4.3, 'count': 143, 'address': '紫金港校区'},
-                {'name': '西溪烘焙工坊', 'category': '烘焙甜点', 'price_range': '16-30元', 'rating': 4.6, 'count': 67, 'address': '西溪校区'},
-                {'name': '求是奶茶', 'category': '奶茶饮品', 'price_range': '13-24元', 'rating': 4.5, 'count': 158, 'address': '玉泉校区北门'},
-                {'name': '玉泉小面', 'category': '面食', 'price_range': '10-20元', 'rating': 4.1, 'count': 72, 'address': '玉泉校区'},
+                {'name': '紫金港食堂', 'category': '食堂', 'zone': '校内', 'price_range': '9-18元', 'rating': 4.3, 'count': 143, 'address': '紫金港校区'},
+                {'name': '西溪烘焙工坊', 'category': '烘焙甜点', 'zone': '校内', 'price_range': '16-30元', 'rating': 4.6, 'count': 67, 'address': '西溪校区'},
+                {'name': '求是奶茶', 'category': '奶茶饮品', 'zone': '周边', 'price_range': '13-24元', 'rating': 4.5, 'count': 158, 'address': '玉泉校区北门'},
+                {'name': '玉泉小面', 'category': '面食', 'zone': '校内', 'price_range': '10-20元', 'rating': 4.1, 'count': 72, 'address': '玉泉校区'},
             ],
             '武汉大学': [
-                {'name': '樱园食堂', 'category': '食堂', 'price_range': '8-15元', 'rating': 4.0, 'count': 66, 'address': '樱园宿舍区'},
-                {'name': '珞珈山小火锅', 'category': '火锅', 'price_range': '40-70元', 'rating': 4.7, 'count': 185, 'address': '校门口商业街'},
-                {'name': '武大咖小馆', 'category': '咖啡甜点', 'price_range': '18-32元', 'rating': 4.4, 'count': 93, 'address': '信息学部'},
-                {'name': '工学部美食城', 'category': '美食广场', 'price_range': '12-25元', 'rating': 4.2, 'count': 121, 'address': '工学部'},
+                {'name': '樱园食堂', 'category': '食堂', 'zone': '校内', 'price_range': '8-15元', 'rating': 4.0, 'count': 66, 'address': '樱园宿舍区'},
+                {'name': '珞珈山小火锅', 'category': '火锅', 'zone': '周边', 'price_range': '40-70元', 'rating': 4.7, 'count': 185, 'address': '校门口商业街'},
+                {'name': '武大咖小馆', 'category': '咖啡甜点', 'zone': '校内', 'price_range': '18-32元', 'rating': 4.4, 'count': 93, 'address': '信息学部'},
+                {'name': '工学部美食城', 'category': '美食广场', 'zone': '校内', 'price_range': '12-25元', 'rating': 4.2, 'count': 121, 'address': '工学部'},
             ],
             '中山大学': [
-                {'name': '康乐园食堂', 'category': '食堂', 'price_range': '9-16元', 'rating': 4.1, 'count': 88, 'address': '南校园'},
-                {'name': '中大糖水铺', 'category': '甜品', 'price_range': '8-16元', 'rating': 4.8, 'count': 203, 'address': '北门美食街'},
-                {'name': '东校区港式茶餐厅', 'category': '茶餐厅', 'price_range': '20-40元', 'rating': 4.5, 'count': 116, 'address': '东校区'},
-                {'name': '珠江边烧烤', 'category': '烧烤', 'price_range': '30-60元', 'rating': 4.3, 'count': 77, 'address': '南门附近'},
+                {'name': '康乐园食堂', 'category': '食堂', 'zone': '校内', 'price_range': '9-16元', 'rating': 4.1, 'count': 88, 'address': '南校园'},
+                {'name': '中大糖水铺', 'category': '甜品', 'zone': '周边', 'price_range': '8-16元', 'rating': 4.8, 'count': 203, 'address': '北门美食街'},
+                {'name': '东校区港式茶餐厅', 'category': '茶餐厅', 'zone': '校内', 'price_range': '20-40元', 'rating': 4.5, 'count': 116, 'address': '东校区'},
+                {'name': '珠江边烧烤', 'category': '烧烤', 'zone': '外卖', 'price_range': '30-60元', 'rating': 4.3, 'count': 77, 'address': '南门附近'},
             ],
         }
 
@@ -107,6 +109,7 @@ def register_cli(app) -> None:
                     name=sp['name'],
                     address=sp['address'],
                     category=sp['category'],
+                    zone=sp['zone'],
                     price_range=sp['price_range'],
                     avg_rating=sp['rating'],
                     rating_count=sp['count'],
@@ -527,11 +530,12 @@ def register_cli(app) -> None:
         shops = []
 
         def make_shop(name, category, rating, count, created_days, owner=None,
-                      status='approved', active=True, price='10-20元'):
+                      status='approved', active=True, price='10-20元', zone='校内'):
             shop = Shop(
                 school_id=school.id,
                 name=name,
                 category=category,
+                zone=zone,
                 price_range=price,
                 address=f'{school.name}·{name}',
                 avg_rating=rating,
@@ -547,16 +551,17 @@ def register_cli(app) -> None:
             shops.append(shop)
             return shop
 
+        # zone 覆盖三种取值，便于在列表里核对角标配色
         dining = make_shop('虚拟第一食堂', '食堂', 4.8, 350, 1)                        # 校内热度第一
         laojie = make_shop('虚拟老街川菜馆', '川菜', 4.5, 120, 12, owner=author1)       # 川菜（店主被 spicy 关注）
         bashu = make_shop('虚拟巴蜀小厨', '川菜', 4.4, 90, 20, owner=author1)
         maocai = make_shop('虚拟川香冒菜', '川菜', 4.6, 70, 8)
-        naigai = make_shop('虚拟奶盖研究所', '奶茶', 4.6, 100, 6, owner=author2)        # 奶茶（店主被 milk 关注）
-        boba = make_shop('虚拟波霸奶茶', '奶茶', 4.5, 80, 18, owner=author2)
+        naigai = make_shop('虚拟奶盖研究所', '奶茶', 4.6, 100, 6, owner=author2, zone='周边')  # 奶茶（店主被 milk 关注）
+        boba = make_shop('虚拟波霸奶茶', '奶茶', 4.5, 80, 18, owner=author2, zone='周边')
         yikoutian = make_shop('虚拟一口甜奶茶', '奶茶', 4.4, 60, 30)
         salad = make_shop('虚拟轻食沙拉坊', '轻食', 0.0, 0, 2)                          # 陷阱店：0 评起，由幽灵评审刷到 5.0/1
-        dessert = make_shop('虚拟港岛甜品', '甜品', 4.7, 150, 25)                      # 高人气干扰项
-        make_shop('虚拟待审烧烤摊', '烧烤', 5.0, 1, 1, status='pending')               # 反例：待审核必须被排除
+        dessert = make_shop('虚拟港岛甜品', '甜品', 4.7, 150, 25, zone='外卖')         # 高人气干扰项
+        make_shop('虚拟待审烧烤摊', '烧烤', 5.0, 1, 1, status='pending', zone='周边')  # 反例：待审核必须被排除
         make_shop('虚拟已下架面馆', '面食', 4.9, 500, 40, active=False)                # 反例：下架必须被排除
 
         # 幽灵评审给陷阱店刷那一条 5.0（用服务层公式从 0 起步，保证 review 行与均分一致）

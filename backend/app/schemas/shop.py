@@ -13,6 +13,7 @@ class ShopSchema(Schema):
     school_name = fields.Method('_school_name')
     name = fields.Str()
     category = fields.Str()
+    zone = fields.Str()  # 大分类：校内 / 周边 / 外卖；空表示未设置，前端不渲染角标
     price_range = fields.Str()
     avg_rating = fields.Function(lambda obj: round(obj.avg_rating or 0.0, 2))
     rating_count = fields.Int()
@@ -33,6 +34,7 @@ class ShopCreateSchema(Schema):
     address = fields.Str(required=True)
     description = fields.Str(load_default=None)
     category = fields.Str(load_default=None)
+    zone = fields.Str(load_default=None)  # 落库前经 coerce_zone 校验，非词表值报 400
     price_range = fields.Str(load_default=None)
     longitude = fields.Float(load_default=None)
     latitude = fields.Float(load_default=None)
@@ -49,6 +51,7 @@ class ShopUpdateSchema(Schema):
     address = fields.Str()
     description = fields.Str()
     category = fields.Str()
+    zone = fields.Str()
     price_range = fields.Str()
     longitude = fields.Float()
     latitude = fields.Float()
@@ -90,6 +93,7 @@ class ShopQuerySchema(Schema):
     school_id = fields.Int()
     keyword = fields.Str()
     category = fields.Str()
+    zone = fields.Str()          # 大分类筛选：校内 / 周边 / 外卖
     sort = fields.Str()          # 排序方式：rating / distance / newest
     longitude = fields.Float()   # 当前位置经度（距离排序用）
     latitude = fields.Float()    # 当前位置纬度
