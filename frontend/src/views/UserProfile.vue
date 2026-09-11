@@ -37,17 +37,20 @@
           <el-button v-if="isSelf" plain @click="router.push('/profile')">
             这是你的主页，去个人中心
           </el-button>
-          <!-- 关注/私信均仅学生账号可用（后端 require_consumer），商户不渲染，与 FollowList 约定一致 -->
+          <!-- 关注/私信均仅学生账号可用（后端 require_consumer），商户不渲染，与 FollowList 约定一致；
+               游客照常渲染但置灰，点了不必先吃一个跳转 -->
           <template v-else-if="!userStore.isMerchant">
             <el-button
               :type="profile.is_following ? 'info' : 'primary'"
               :plain="profile.is_following"
+              :disabled="guestLocked"
               @click="handleFollow"
             >
               {{ profile.is_following ? '已关注' : '+ 关注' }}
             </el-button>
-            <el-button type="primary" plain @click="sendDm">发私信</el-button>
+            <el-button type="primary" plain :disabled="guestLocked" @click="sendDm">发私信</el-button>
           </template>
+          <LoginHint v-if="guestLocked" class="profile-login-hint" text="登录后即可关注 / 发私信" />
         </div>
       </div>
 
@@ -78,8 +81,10 @@ import { ElMessage } from 'element-plus'
 
 import { getPostsByUser } from '@/api/post'
 import { getUserProfile } from '@/api/user'
+import LoginHint from '@/components/LoginHint.vue'
 import Pagination from '@/components/Pagination.vue'
 import PostCard from '@/components/PostCard.vue'
+import { useLoginGate } from '@/composables/useLoginGate'
 import { usePostStore } from '@/store/post'
 import { useUserStore } from '@/store/user'
 
@@ -89,6 +94,7 @@ const route = useRoute()
 const router = useRouter()
 const postStore = usePostStore()
 const userStore = useUserStore()
+const { guestLocked, requireLogin } = useLoginGate()
 
 const userId = computed(() => Number(route.params.id))
 const profile = ref(null)
@@ -108,15 +114,6 @@ const roleTag = computed(() => {
 })
 
 const formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString('zh-CN') : '-')
-
-const requireLogin = () => {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录')
-    router.push({ path: '/login', query: { redirect: route.fullPath } })
-    return false
-  }
-  return true
-}
 
 async function loadProfile() {
   loading.value = true
@@ -249,8 +246,14 @@ watch(() => route.params.id, loadAll)
 .profile-actions {
   margin-top: 20px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+}
+/* 游客态提示独占一行，免得挤在两个按钮中间 */
+.profile-login-hint {
+  flex-basis: 100%;
+  text-align: center;
 }
 .notes-section {
   margin-top: 28px;

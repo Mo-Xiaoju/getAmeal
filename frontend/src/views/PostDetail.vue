@@ -62,6 +62,7 @@
           size="small"
           :type="post.is_following ? 'info' : 'primary'"
           :plain="post.is_following"
+          :disabled="guestLocked"
           @click="handleFollow"
         >
           {{ post.is_following ? '已关注' : '+ 关注' }}
@@ -105,6 +106,7 @@
              颜色沿用按钮类型：已点赞 danger 红、已收藏 warning 黄，与列表卡片一致 -->
         <el-button
           :type="post.liked ? 'danger' : 'default'"
+          :disabled="guestLocked"
           @click="handleLike"
         >
           <el-icon><ThumbUpIcon :filled="!!post.liked" /></el-icon>
@@ -112,6 +114,7 @@
         </el-button>
         <el-button
           :type="post.favorited ? 'warning' : 'default'"
+          :disabled="guestLocked"
           @click="handleFavorite"
         >
           <el-icon><StarIcon :filled="!!post.favorited" /></el-icon>
@@ -137,10 +140,14 @@
             :rows="2"
             maxlength="200"
             show-word-limit
-            placeholder="说说你的看法…"
+            :disabled="guestLocked"
+            :placeholder="guestLocked ? '登录后即可评论' : '说说你的看法…'"
           />
+          <LoginHint v-if="guestLocked" text="登录后即可发表评论" />
           <div class="comment-actions">
-            <el-button type="primary" :loading="commenting" @click="handleComment">发表评论</el-button>
+            <el-button type="primary" :disabled="guestLocked" :loading="commenting" @click="handleComment">
+              发表评论
+            </el-button>
           </div>
         </div>
 
@@ -179,8 +186,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Shop } from '@element-plus/icons-vue'
 
+import LoginHint from '@/components/LoginHint.vue'
 import StarIcon from '@/components/StarIcon.vue'
 import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
+import { useLoginGate } from '@/composables/useLoginGate'
 import { openImage } from '@/composables/useImageViewer'
 import { useUserNav } from '@/composables/useUserNav'
 import { usePostStore } from '@/store/post'
@@ -191,6 +200,7 @@ const router = useRouter()
 const postStore = usePostStore()
 const userStore = useUserStore()
 const { goUser } = useUserNav()
+const { guestLocked, requireLogin } = useLoginGate()
 
 const postId = computed(() => Number(route.params.id))
 const post = computed(() => postStore.postDetail || {})
@@ -202,23 +212,15 @@ const commentsLoading = ref(true)
 const notFound = ref(false)
 
 const isMine = computed(() => userStore.userInfo?.id === post.value.user_id)
-// 关注同样仅学生账号可用（后端 require_consumer），商户不渲染
+// 关注同样仅学生账号可用（后端 require_consumer），商户不渲染；
+// 游客照常渲染但置灰（guestLocked），避免点了才知道要登录
 const canFollow = computed(
-  () => userStore.isLoggedIn && !userStore.isMerchant && !isMine.value && !!post.value.user_id,
+  () => !userStore.isMerchant && !isMine.value && !!post.value.user_id,
 )
 
 const formatDate = (iso) => {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString('zh-CN')
-}
-
-const requireLogin = () => {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录')
-    router.push({ path: '/login', query: { redirect: route.fullPath } })
-    return false
-  }
-  return true
 }
 
 const handleFollow = async () => {

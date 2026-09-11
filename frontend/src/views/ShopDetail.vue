@@ -81,14 +81,18 @@
               <el-button
                 :type="shopStore.isFavorited ? 'warning' : 'primary'"
                 :plain="!shopStore.isFavorited"
+                :disabled="guestLocked"
                 @click="handleFavorite"
               >
                 <el-icon><StarIcon :filled="!!shopStore.isFavorited" /></el-icon>
                 {{ shopStore.isFavorited ? '已收藏' : '收藏店铺' }}
               </el-button>
+              <!-- 写评价只是滚动定位，不需要登录；表单本身对游客置灰 -->
               <el-button type="success" plain :icon="EditPen" @click="scrollToReview">写评价</el-button>
               <!-- 菜单可能更新不及时：同学可代为补充菜品（走审核，同店同名去重） -->
-              <el-button v-if="canContribute" plain :icon="Plus" @click="openDishDialog">补充菜品</el-button>
+              <el-button v-if="canContribute" plain :icon="Plus" :disabled="guestLocked" @click="openDishDialog">
+                补充菜品
+              </el-button>
             </template>
             <!-- 仅本商户的店铺出现管理入口；非本商户的店铺不渲染任何管理按钮 -->
             <el-button v-else-if="isMyShop" type="primary" :icon="Shop" @click="router.push('/merchant')">
@@ -129,7 +133,15 @@
         v-if="!dishStore.loading && !dishStore.shopDishes.length"
         :description="emptyDishesText"
       >
-        <el-button v-if="canContribute" size="small" type="primary" plain :icon="Plus" @click="openDishDialog">
+        <el-button
+          v-if="canContribute"
+          size="small"
+          type="primary"
+          plain
+          :icon="Plus"
+          :disabled="guestLocked"
+          @click="openDishDialog"
+        >
           补充菜品
         </el-button>
       </el-empty>
@@ -143,7 +155,7 @@
         <div class="review-form">
           <div class="form-rate">
             <span class="form-label">评分：</span>
-            <el-rate v-model="form.rating" :texts="rateTexts" show-text />
+            <el-rate v-model="form.rating" :disabled="guestLocked" :texts="rateTexts" show-text />
           </div>
           <el-input
             v-model="form.content"
@@ -151,10 +163,14 @@
             :rows="3"
             maxlength="200"
             show-word-limit
-            placeholder="分享你的用餐体验（选填）"
+            :disabled="guestLocked"
+            :placeholder="guestLocked ? '登录后即可评价' : '分享你的用餐体验（选填）'"
           />
+          <LoginHint v-if="guestLocked" text="登录后即可发表评价" />
           <div class="form-actions">
-            <el-button type="primary" :loading="submitting" @click="handleSubmit">发布评价</el-button>
+            <el-button type="primary" :disabled="guestLocked" :loading="submitting" @click="handleSubmit">
+              发布评价
+            </el-button>
           </div>
         </div>
       </template>
@@ -238,7 +254,9 @@ import StarIcon from '@/components/StarIcon.vue'
 
 import { submitDish } from '@/api/contribute'
 import DishCard from '@/components/DishCard.vue'
+import LoginHint from '@/components/LoginHint.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
+import { useLoginGate } from '@/composables/useLoginGate'
 import { openImage } from '@/composables/useImageViewer'
 import { useUserNav } from '@/composables/useUserNav'
 import Pagination from '@/components/Pagination.vue'
@@ -254,6 +272,7 @@ const { goUser } = useUserNav()
 const shopStore = useShopStore()
 const userStore = useUserStore()
 const dishStore = useDishStore()
+const { guestLocked, requireLogin } = useLoginGate()
 
 const shopId = computed(() => Number(route.params.id))
 const imageFailed = ref(false)
@@ -343,15 +362,6 @@ const loadReviews = async (page = 1) => {
   } finally {
     reviewsLoading.value = false
   }
-}
-
-const requireLogin = () => {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录')
-    router.push({ path: '/login', query: { redirect: route.fullPath } })
-    return false
-  }
-  return true
 }
 
 const handleFavorite = async () => {

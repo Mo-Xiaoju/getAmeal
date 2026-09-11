@@ -9,8 +9,11 @@
       <el-button v-if="userStore.isMerchant" type="success" :icon="Shop" @click="router.push('/merchant')">
         商户中心
       </el-button>
-      <el-button v-else type="primary" :icon="EditPen" @click="handleCreate">发布笔记</el-button>
+      <el-button v-else type="primary" :icon="EditPen" :disabled="guestLocked" @click="handleCreate">
+        发布笔记
+      </el-button>
     </div>
+    <LoginHint v-if="guestLocked" text="登录后即可发布探店笔记" />
 
     <!-- 筛选栏（我的笔记页隐藏） -->
     <div v-if="!isMine" class="filter-bar">
@@ -77,11 +80,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { EditPen, Search, Shop } from '@element-plus/icons-vue'
 
+import LoginHint from '@/components/LoginHint.vue'
 import Pagination from '@/components/Pagination.vue'
 import PostCard from '@/components/PostCard.vue'
+import { useLoginGate } from '@/composables/useLoginGate'
 import { usePostStore } from '@/store/post'
 import { useSchoolStore } from '@/store/school'
 import { useUserStore } from '@/store/user'
@@ -91,6 +95,7 @@ const router = useRouter()
 const postStore = usePostStore()
 const schoolStore = useSchoolStore()
 const userStore = useUserStore()
+const { guestLocked, requireLogin } = useLoginGate()
 
 const sort = ref('newest')
 const keyword = ref('')
@@ -114,12 +119,9 @@ const handleChange = () => loadList(1)
 // 不重新拉列表的话，两种模式的标题变了、列表却还是对方的数据
 watch(isMine, () => loadList(1))
 
+// 游客按钮已置灰，requireLogin 只兜底（如页面停留期间 token 失效）
 const handleCreate = () => {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录再发布笔记')
-    router.push({ path: '/login', query: { redirect: '/posts/create' } })
-    return
-  }
+  if (!requireLogin()) return
   router.push('/posts/create')
 }
 
