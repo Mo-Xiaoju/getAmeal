@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 
+import * as commentApi from '@/api/comment'
+import * as reviewApi from '@/api/review'
 import * as shopApi from '@/api/shop'
 
 export const useShopStore = defineStore('shop', {
@@ -59,9 +61,33 @@ export const useShopStore = defineStore('shop', {
       if (store) this.reviews = data.items || []
       return data
     },
-    // 发表评价，shopId + payload: { rating, content }
+    // 发表评价，shopId + payload: { rating, content, images, dish_id }
     async addReview(shopId, payload) {
       const res = await shopApi.addReview(shopId, payload)
+      return res.data.data
+    },
+    // ---- 评价互动（纯 HTTP 包装，不写 state）----
+    // 点赞态与回复列表分别落在店铺页的 store.reviews 和菜品页的本地点赞数组里，
+    // store 侧的 mutation helper 够不到后者，所以统一由视图拿到返回值后就地更新。
+    // 同 postStore.like。
+    async reviewLike(id) {
+      const res = await reviewApi.toggleReviewLike(id)
+      return res.data.data
+    },
+    // 评价下面的回复点赞走 /api/comments/<id>/like：comments 是一张表，
+    // 评价回复与笔记评论共用同一个点赞入口（postStore.commentLike 是同一个接口的另一份包装）
+    async commentLike(id) {
+      const res = await commentApi.toggleCommentLike(id)
+      return res.data.data
+    },
+    async addReviewReply(id, content, parentId = null) {
+      // 只发 parent_id：被回复人由服务端从父评论作者派生（客户端传了也无效）
+      const payload = parentId ? { content, parent_id: parentId } : { content }
+      const res = await reviewApi.addReviewReply(id, payload)
+      return res.data.data
+    },
+    async fetchReviewReplies(id, params = {}) {
+      const res = await reviewApi.getReviewReplies(id, params)
       return res.data.data
     },
     // 切换收藏状态，shopId（返回当前是否已收藏）

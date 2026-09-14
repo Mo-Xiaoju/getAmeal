@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 
+import * as commentApi from '@/api/comment'
 import * as postApi from '@/api/post'
 
 // 列表结果的"查询范围"指纹：范围一变，store 里那份 postList 就不再属于当前查询，必须先清掉，
@@ -116,9 +117,19 @@ export const usePostStore = defineStore('post', {
       this.commentTotal = data.total || 0
       return data
     },
-    // 发表评论
-    async comment(id, content) {
-      const res = await postApi.addComment(id, { content })
+    // 发表评论；回复某条评论时带 parentId（被回复人由服务端派生，前端不传）
+    async comment(id, content, parentId = null) {
+      const payload = parentId ? { content, parent_id: parentId } : { content }
+      const res = await postApi.addComment(id, payload)
+      return res.data.data
+    },
+    // ---- 评论互动（纯 HTTP 包装，不写 state，同 like）----
+    async commentLike(id) {
+      const res = await commentApi.toggleCommentLike(id)
+      return res.data.data
+    },
+    async fetchCommentReplies(id, params = {}) {
+      const res = await commentApi.getCommentReplies(id, params)
       return res.data.data
     },
     // 关注/取关用户

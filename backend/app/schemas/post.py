@@ -4,25 +4,11 @@ import json
 from flask import g
 from marshmallow import EXCLUDE, Schema, fields
 
-from app.models import Favorite, Like, UserFollow
-
-
-def _liked_post_ids() -> set:
-    """当前登录用户已点赞的笔记 id 集合。
-
-    列表卡片也要按"我点过赞没有"上色，逐条查库在列表页就是 N 次查询，
-    所以这里一次取完、并在本次请求内缓存（g 是请求级的，不会跨请求串数据）。
-    """
-    ids = getattr(g, 'liked_post_ids', None)
-    if ids is None:
-        user = getattr(g, 'current_user', None)
-        ids = (
-            {row[0] for row in Like.query.with_entities(Like.post_id).filter_by(user_id=user.id)}
-            if user is not None
-            else set()
-        )
-        g.liked_post_ids = ids
-    return ids
+from app.models import Favorite, UserFollow
+# 评论/回复 Schema 的实现在 schemas/comment.py（笔记评论与评价回复共用一张表），
+# 这里再导出一次，使 post_service 现有的 import 不必挪动。
+from app.schemas.comment import CommentCreateSchema, CommentSchema  # noqa: F401
+from app.schemas.interaction import liked_post_ids as _liked_post_ids
 
 
 def _favorited_post_ids() -> set:
@@ -112,28 +98,4 @@ class PostCreateSchema(Schema):
         unknown = EXCLUDE
 
 
-class CommentSchema(Schema):
-    """笔记评论。"""
-
-    id = fields.Int()
-    post_id = fields.Int()
-    user_id = fields.Int()
-    nickname = fields.Method('_nickname')
-    avatar_url = fields.Method('_avatar')
-    content = fields.Str()
-    created_at = fields.DateTime()
-
-    def _nickname(self, obj) -> str:
-        return obj.user.nickname if obj.user else None
-
-    def _avatar(self, obj) -> str:
-        return obj.user.avatar_url if obj.user else None
-
-
-class CommentCreateSchema(Schema):
-    """发表评论请求。"""
-
-    content = fields.Str(required=True)
-
-    class Meta:
-        unknown = EXCLUDE
+# CommentSchema / CommentCreateSchema 见 app/schemas/comment.py（已在文件顶部导入并再导出）

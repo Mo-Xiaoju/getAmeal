@@ -1,8 +1,9 @@
 """菜品业务逻辑。"""
 import json
 
-from app.models import Dish, Shop
+from app.models import Dish, Review, Shop
 from app.schemas.dish import DishSchema
+from app.services.shop_service import ShopService
 from app.utils.exceptions import NotFoundError
 from app.utils.pagination import paginate
 
@@ -120,3 +121,18 @@ class DishService:
     def get_detail(dish_id: int) -> dict:
         """菜品详情。"""
         return _dish_schema.dump(_get_active_dish(dish_id))
+
+    # ---- 菜品评价 ----
+    @staticmethod
+    def list_reviews(dish_id: int, params: dict) -> dict:
+        """菜品评价列表：在店铺页写评价时关联了本菜品的那些（分页，按时间倒序）。
+
+        菜品页只读——写评价的入口在店铺页（那里才有评分和关联菜品选择）。
+        """
+        dish = _get_active_dish(dish_id)
+        query = (
+            Review.query
+            .filter_by(dish_id=dish.id)
+            .order_by(Review.created_at.desc(), Review.id.desc())
+        )
+        return ShopService.list_reviews_page(query, params)

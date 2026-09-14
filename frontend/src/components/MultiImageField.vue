@@ -8,6 +8,7 @@
         :model-value="url"
         :size="size"
         :tip="url ? '' : tip"
+        :disabled="disabled"
         @update:model-value="onChange(i, $event)"
       />
     </div>
@@ -27,6 +28,9 @@ const props = defineProps({
   max: { type: Number, default: 9 },
   size: { type: Number, default: 88 }, // 每张预览框边长 px
   tip: { type: String, default: '添加图片' }, // 空上传槽的小字说明
+  // 置灰整个组件（游客态）：必须透传到 ImageField，否则点击仍会打开文件选择器，
+  // 上传接口是 @require_login，用户会在填表填到一半时被弹去登录页
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 

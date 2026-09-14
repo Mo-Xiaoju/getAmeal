@@ -91,38 +91,22 @@
         </div>
       </div>
 
-      <!-- 关联店铺评价 -->
+      <!-- 菜品评价：在店铺页写评价时关联了本菜品的那些。
+           菜品页只读（写评价的入口在店铺页，那里才有评分和关联菜品选择），
+           但点赞与回复照常可用 —— 只读不等于不能互动 -->
       <section class="review-section">
-        <h2 class="section-title">{{ dish.shop_name }} · 店铺评价</h2>
+        <h2 class="section-title">菜品评价</h2>
         <!-- 只在"没有任何评价可显示"时用骨架占位，已有列表时不再盖一层白遮罩 -->
         <div v-if="reviewsLoading && !reviews.length" class="review-list">
           <el-skeleton :rows="3" animated />
         </div>
         <div v-else class="review-list">
-          <el-empty v-if="!reviews.length" description="暂无评价" />
-          <div v-for="review in reviews" :key="review.id" class="review-item">
-            <el-avatar
-              class="user-link"
-              :size="40"
-              :src="review.avatar_url || undefined"
-              @click="goUser(review.user_id)"
-            >
-              {{ (review.nickname || 'U').charAt(0) }}
-            </el-avatar>
-            <div class="review-body">
-              <div class="review-head">
-                <span class="review-nickname">{{ review.nickname || '匿名用户' }}</span>
-                <RatingStars :rating="review.rating || 0" />
-                <span class="review-time">{{ formatDate(review.created_at) }}</span>
-              </div>
-              <p v-if="review.content" class="review-content">{{ review.content }}</p>
-            </div>
-          </div>
-        </div>
-        <div v-if="reviewTotal > reviews.length" class="review-more">
-          <el-button text type="primary" @click="router.push(`/shops/${dish.shop_id}`)">
-            查看全部评价 →
-          </el-button>
+          <el-empty v-if="!reviews.length" description="这道菜还没有评价">
+            <el-button type="primary" plain @click="router.push(`/shops/${dish.shop_id}`)">
+              去店铺页写一条
+            </el-button>
+          </el-empty>
+          <ReviewItem v-for="review in reviews" :key="review.id" :review="review" :show-dish="false" />
         </div>
       </section>
     </div>
@@ -135,15 +119,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { Food, Shop } from '@element-plus/icons-vue'
 
 import RatingStars from '@/components/RatingStars.vue'
-import { useUserNav } from '@/composables/useUserNav'
+import ReviewItem from '@/components/ReviewItem.vue'
 import { useDishStore } from '@/store/dish'
-import { useShopStore } from '@/store/shop'
 
 const route = useRoute()
 const router = useRouter()
-const { goUser } = useUserNav()
 const dishStore = useDishStore()
-const shopStore = useShopStore()
 
 const dishId = computed(() => Number(route.params.id))
 const dish = computed(() => dishStore.dishDetail || {})
@@ -165,36 +146,23 @@ watch(
 const reviewsLoading = ref(true)
 // 详情请求失败（菜品不存在 / 已下架）：页面切空态而不是停在骨架屏上
 const notFound = ref(false)
+// 本地 ref 而不是写进 store：每个菜品页一份，写进 store 会和店铺页那份 reviews 互相污染
 const reviews = ref([])
-const reviewTotal = ref(0)
 
 const priceText = computed(() => String(Number(dish.value.price) || 0))
 
-const formatDate = (iso) => {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('zh-CN')
-}
-
 onMounted(async () => {
-  let detail
   try {
-    detail = await dishStore.fetchDishDetail(dishId.value)
+    await dishStore.fetchDishDetail(dishId.value)
   } catch (e) {
     // 菜品不存在 / 已下架：接口层已提示，这里切空态并解除评论骨架
     notFound.value = true
     reviewsLoading.value = false
     return
   }
-  if (!detail?.shop_id) {
-    // 详情没有关联店铺（理论上不会走到）：解除骨架，交给空态文案
-    reviewsLoading.value = false
-    return
-  }
   try {
-    // store=false：只取这 3 条预览，不写 shopStore.reviews（那是店铺详情页的完整列表）
-    const data = await shopStore.fetchReviews(detail.shop_id, { page: 1, page_size: 3 }, { store: false })
+    const data = await dishStore.fetchDishReviews(dishId.value, { page: 1, page_size: 20 })
     reviews.value = data.items || []
-    reviewTotal.value = data.total || 0
   } finally {
     reviewsLoading.value = false
   }
@@ -344,51 +312,5 @@ onMounted(async () => {
   padding: 8px 18px;
   min-height: 120px;
 }
-.review-item {
-  display: flex;
-  gap: 14px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f2f3f5;
-}
-.review-item:last-child {
-  border-bottom: none;
-}
-.review-body {
-  flex: 1;
-  min-width: 0;
-}
-.review-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-.review-nickname {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-/* 头像可点进评价者主页 */
-.user-link {
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.user-link:hover {
-  opacity: 0.85;
-}
-.review-time {
-  font-size: 12px;
-  color: #c0c4cc;
-}
-.review-content {
-  margin: 0;
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.7;
-}
-.review-more {
-  margin-top: 12px;
-  text-align: center;
-}
+/* 单条评价的样式在 ReviewItem.vue（店铺页与菜品页共用），这里只留列表容器 */
 </style>

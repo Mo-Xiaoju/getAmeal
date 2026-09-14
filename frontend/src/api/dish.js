@@ -11,3 +11,7 @@ export const getDishRecommend = (params) => request.get('/dishes/recommend', { p
 
 // 菜品详情
 export const getDishDetail = (dishId) => request.get(`/dishes/${dishId}`)
+
+// 菜品评价列表（只读；评价在店铺页发起时关联本菜品），params: { page, page_size }
+export const getDishReviews = (dishId, params) =>
+  request.get(`/dishes/${dishId}/reviews`, { params })

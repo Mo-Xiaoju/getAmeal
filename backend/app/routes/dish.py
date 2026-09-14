@@ -27,6 +27,18 @@ def get_dish_detail(dish_id):
     return ok(data)
 
 
+@bp_dish.route('/<int:dish_id>/reviews', methods=['GET'])
+@optional_login
+def get_dish_reviews(dish_id):
+    """菜品评价列表（分页）：在店铺页写评价时关联了本菜品的那些。
+
+    菜品页只读——写评价的入口在店铺页（那里才有评分和关联菜品选择），
+    所以这里没有对应的 POST。
+    """
+    params = request.args.to_dict()
+    return ok(DishService.list_reviews(dish_id, params))
+
+
 @bp_dish.route('', methods=['GET'], strict_slashes=False)
 def get_dish_list():
     """菜品列表：支持 school_id / shop_id 过滤、分页。"""

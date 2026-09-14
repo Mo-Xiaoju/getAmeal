@@ -166,6 +166,25 @@
             :disabled="guestLocked"
             :placeholder="guestLocked ? '登录后即可评价' : '分享你的用餐体验（选填）'"
           />
+          <!-- 关联菜品（选填）：选了之后这条评价同时算作该菜品的评价，会出现在菜品页的
+               「菜品评价」里。选项直接取本店菜品，本店菜品为空时不显示这个下拉 -->
+          <div v-if="dishStore.shopDishes.length" class="form-row">
+            <span class="form-label">关联菜品：</span>
+            <el-select
+              v-model="form.dishId"
+              clearable
+              filterable
+              :disabled="guestLocked"
+              placeholder="不关联"
+              class="form-dish-select"
+            >
+              <el-option v-for="d in dishStore.shopDishes" :key="d.id" :label="d.name" :value="d.id" />
+            </el-select>
+          </div>
+          <div class="form-row form-row-images">
+            <span class="form-label">添加图片：</span>
+            <MultiImageField v-model="form.images" :size="76" :disabled="guestLocked" />
+          </div>
           <LoginHint v-if="guestLocked" text="登录后即可发表评价" />
           <div class="form-actions">
             <el-button type="primary" :disabled="guestLocked" :loading="submitting" @click="handleSubmit">
@@ -186,24 +205,8 @@
           v-if="!shopStore.reviews.length"
           description="还没有评价，来发表第一条吧"
         />
-        <div v-for="review in shopStore.reviews" :key="review.id" class="review-item">
-          <el-avatar
-            class="user-link"
-            :size="40"
-            :src="review.avatar_url || undefined"
-            @click="goUser(review.user_id)"
-          >
-            {{ (review.nickname || 'U').charAt(0) }}
-          </el-avatar>
-          <div class="review-body">
-            <div class="review-head">
-              <span class="review-nickname">{{ review.nickname || '匿名用户' }}</span>
-              <RatingStars :rating="review.rating || 0" />
-              <span class="review-time">{{ formatDate(review.created_at) }}</span>
-            </div>
-            <p v-if="review.content" class="review-content">{{ review.content }}</p>
-          </div>
-        </div>
+        <!-- 点赞/回复就地改 review 对象（见 ReviewItem），不重载列表，所以分页不会被重置 -->
+        <ReviewItem v-for="review in shopStore.reviews" :key="review.id" :review="review" />
       </div>
       <Pagination
         v-if="reviewPagination.total_pages > 1"
@@ -258,9 +261,9 @@ import LoginHint from '@/components/LoginHint.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
 import { useLoginGate } from '@/composables/useLoginGate'
 import { openImage } from '@/composables/useImageViewer'
-import { useUserNav } from '@/composables/useUserNav'
 import Pagination from '@/components/Pagination.vue'
 import RatingStars from '@/components/RatingStars.vue'
+import ReviewItem from '@/components/ReviewItem.vue'
 import ZoneRibbon from '@/components/ZoneRibbon.vue'
 import { useDishStore } from '@/store/dish'
 import { useShopStore } from '@/store/shop'
@@ -268,7 +271,6 @@ import { useUserStore } from '@/store/user'
 
 const route = useRoute()
 const router = useRouter()
-const { goUser } = useUserNav()
 const shopStore = useShopStore()
 const userStore = useUserStore()
 const dishStore = useDishStore()
@@ -285,7 +287,7 @@ const reviewSection = ref(null)
 const reviewPagination = reactive({ page: 1, page_size: 10, total: 0, total_pages: 0 })
 
 const rateTexts = ['很差', '较差', '一般', '不错', '超赞']
-const form = reactive({ rating: 5, content: '' })
+const form = reactive({ rating: 5, content: '', images: [], dishId: null })
 
 const shop = computed(() => shopStore.shopDetail || {})
 // 当前登录商户是否为该店 owner（决定是否展示管理按钮）
@@ -347,11 +349,6 @@ const handleSubmitDish = async () => {
   }
 }
 
-const formatDate = (iso) => {
-  if (!iso) return ''
-  return new Date(iso).toLocaleDateString('zh-CN')
-}
-
 const loadReviews = async (page = 1) => {
   reviewsLoading.value = true
   try {
@@ -385,10 +382,15 @@ const handleSubmit = async () => {
     await shopStore.addReview(shopId.value, {
       rating: form.rating,
       content: form.content.trim() || undefined,
+      images: form.images,
+      // el-select clearable 清空时给的是 null/''，后端把 ''/0/null 一律当作未关联
+      dish_id: form.dishId || undefined,
     })
     ElMessage.success('评价发布成功')
     form.content = ''
     form.rating = 5
+    form.images = []
+    form.dishId = null
     loadReviews(1)
     // 刷新详情以更新评分
     shopStore.fetchShopDetail(shopId.value)
@@ -547,10 +549,23 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 12px;
 }
+/* 关联菜品 / 加图：标签在左、控件在右，与上面的评分行对齐 */
+.form-row {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+.form-row-images {
+  align-items: flex-start;
+}
+.form-dish-select {
+  width: 240px;
+}
 .form-label {
   font-size: 14px;
   color: #606266;
   margin-right: 4px;
+  flex-shrink: 0;
 }
 .form-actions {
   display: flex;
@@ -564,49 +579,7 @@ onMounted(async () => {
   padding: 8px 18px;
   min-height: 120px;
 }
-.review-item {
-  display: flex;
-  gap: 14px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f2f3f5;
-}
-.review-item:last-child {
-  border-bottom: none;
-}
-.review-body {
-  flex: 1;
-  min-width: 0;
-}
-.review-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-.review-nickname {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-/* 头像可点进评价者主页 */
-.user-link {
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.user-link:hover {
-  opacity: 0.85;
-}
-.review-time {
-  font-size: 12px;
-  color: #c0c4cc;
-}
-.review-content {
-  margin: 0;
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.7;
-}
+/* 单条评价的样式在 ReviewItem.vue（店铺页与菜品页共用），这里只留列表容器 */
 .dish-tip {
   margin: 0 0 14px;
   font-size: 13px;

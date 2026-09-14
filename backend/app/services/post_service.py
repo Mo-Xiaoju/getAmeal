@@ -5,12 +5,12 @@ import math
 from app.extensions import db
 from app.models import Comment, Favorite, Like, Post, Shop
 from app.schemas.post import (
-    CommentCreateSchema,
     CommentSchema,
     PostCreateSchema,
     PostDetailSchema,
     PostSchema,
 )
+from app.services.comment_service import CommentService
 from app.services.recommend_service import RecommendService
 from app.services.event_log_service import EventLogService
 from app.utils.exceptions import NotFoundError, PermissionError, ValidationError
@@ -199,27 +199,42 @@ class PostService:
         db.session.commit()
         return {'favorited': True, 'favorite_count': post.favorite_count}
 
-    # ---- 评论 ----
+    # ---- 评论（发表/列表的实现在 CommentService，笔记与评价共用一张表）----
     @staticmethod
     def add_comment(user, post_id: int, data: dict) -> dict:
-        """发表评论，并更新笔记评论数。"""
-        data = CommentCreateSchema().load(data)
+        """发表评论或回复，并更新笔记评论数。
+
+        只有顶层评论才计入 comment_count，回复不算 —— 这样 comment_count 恒等于
+        顶层评论数，也就等于首屏分页的 total，两个数字在页面上不会打架。
+        代价是标题「评论（N）」不含回复数，这是有意的取舍。
+        """
         post = _get_active_post(post_id)
-        content = (data.get('content') or '').strip()
-        if not content:
-            raise ValidationError(message='评论内容不能为空', code=4000)
-        comment = Comment(user_id=user.id, post_id=post.id, content=content[:500])
-        post.comment_count += 1
-        db.session.add(comment)
-        db.session.commit()
-        return _comment_schema.dump(comment)
+        comment = CommentService.add_reply(user, data, post_id=post_id)
+        if comment.get('parent_id') is None:
+            post.comment_count += 1
+            db.session.commit()
+        return comment
 
     @staticmethod
     def list_comments(post_id: int, params: dict) -> dict:
-        """笔记评论列表（分页，按时间正序）。"""
+        """笔记顶层评论列表（分页，按时间正序）。
+
+        只取 parent_id 为空的：回复挂在各自的顶层评论下面展示，不过滤的话
+        会既嵌套渲染一遍、又作为顶层评论重复出现一遍，分页 total 也跟着虚高。
+        """
         _get_active_post(post_id)
-        query = Comment.query.filter_by(post_id=post_id).order_by(Comment.id.asc())
+        query = (
+            Comment.query
+            .filter_by(post_id=post_id)
+            .filter(Comment.parent_id.is_(None))
+            .order_by(Comment.id.asc())
+        )
         page = int(params.get('page') or 1)
         page_size = int(params.get('page_size') or 20)
         result = paginate(query, page, page_size)
+        # 先装填预览，序列化时每条顶层评论的 _replies 才拿得到子回复
+        CommentService.attach_reply_previews([post_id], 'post')
         return {**result, 'items': _comment_list_schema.dump(result['items'])}
+
+    # 展开某条评论的全部回复走 routes/comment.py 的 GET /api/comments/<id>/replies
+    # （与评论点赞同一个前缀），post_service 不重复透传。

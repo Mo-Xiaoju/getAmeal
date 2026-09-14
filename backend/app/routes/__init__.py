@@ -7,12 +7,14 @@ from app.routes import (
     auth,
     chat,
     circle,
+    comment,
     contribute,
     dish,
     dm,
     media,
     merchant,
     post,
+    review,
     school,
     shop,
     user,
@@ -26,6 +28,8 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(shop.bp_shop, url_prefix='/api/shops')
     app.register_blueprint(dish.bp_dish, url_prefix='/api/dishes')
     app.register_blueprint(post.bp_post, url_prefix='/api/posts')
+    app.register_blueprint(review.bp_review, url_prefix='/api/reviews')
+    app.register_blueprint(comment.bp_comment, url_prefix='/api/comments')
     app.register_blueprint(user.bp_user, url_prefix='/api/user')
     app.register_blueprint(chat.bp_chat, url_prefix='/api/chat')
     app.register_blueprint(circle.bp_circle, url_prefix='/api/circles')

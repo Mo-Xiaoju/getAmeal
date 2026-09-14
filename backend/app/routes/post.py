@@ -65,8 +65,13 @@ def toggle_favorite(post_id):
 
 
 @bp_post.route('/<int:post_id>/comments', methods=['GET'])
+@optional_login
 def get_comments(post_id):
-    """笔记评论列表（分页）。"""
+    """笔记评论列表（分页，带登录态时回显点赞/回复状态）。
+
+    必须挂 @optional_login：评论的 liked 字段靠 g.current_user 判定，
+    不解析 token 的话已登录用户拿到的点赞态会全是 false。
+    """
     params = request.args.to_dict()
     return ok(PostService.list_comments(post_id, params))
 
@@ -74,6 +79,9 @@ def get_comments(post_id):
 @bp_post.route('/<int:post_id>/comments', methods=['POST'])
 @require_consumer
 def add_comment(post_id):
-    """发表评论（需学生/管理员，商户不可）。"""
+    """发表评论或回复（需学生/管理员，商户不可）。
+
+    顶层评论与回复走同一个接口：回复多带一个 parent_id（服务端据此派生被回复人）。
+    """
     data = request.get_json(silent=True) or {}
     return ok(PostService.add_comment(g.current_user, post_id, data), message='评论成功')

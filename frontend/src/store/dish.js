@@ -45,6 +45,13 @@ export const useDishStore = defineStore('dish', {
         this.loading = false
       }
     },
+    // 菜品评价列表（薄包装：视图不直接调 api/ 是本仓库的既有约定）。
+    // 结果不写 state —— 菜品页的评价是本地 ref（每个菜品页一份），写进 store
+    // 反而会和店铺页那份 reviews 互相污染。
+    async fetchDishReviews(dishId, params = {}) {
+      const res = await dishApi.getDishReviews(dishId, params)
+      return res.data.data
+    },
     // 推荐菜品，params: { school_id, limit }
     async fetchRecommend(params = {}) {
       // 换学校时先清空：否则会先把上一所学校的推荐渲染到新学校的标题下再被替换（观感上就是"闪一下"）。

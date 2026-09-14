@@ -18,7 +18,8 @@ export const getShopDetail = (shopId) => request.get(`/shops/${shopId}`)
 // 店铺评价列表，params: { page, page_size }
 export const getShopReviews = (shopId, params) => request.get(`/shops/${shopId}/reviews`, { params })
 
-// 发表评价，data: { rating, content, images }
+// 发表评价，data: { rating, content, images, dish_id }
+// dish_id 可空：填了表示这条评价同时算作该菜品的评价（菜品页「菜品评价」就展示这些）
 export const addReview = (shopId, data) => request.post(`/shops/${shopId}/reviews`, data)
 
 // 收藏店铺

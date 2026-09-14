@@ -4,10 +4,12 @@ import math
 
 from app.categories import canonicalize, canonicalize_zone
 from app.extensions import db
-from app.models import Favorite, Review, Shop
-from app.schemas.shop import ReviewSchema, ShopDetailSchema, ShopSchema
+from app.models import Dish, Favorite, Review, Shop
+from app.schemas.shop import ReviewCreateSchema, ReviewSchema, ShopDetailSchema, ShopSchema
+from app.services.comment_service import CommentService
 from app.utils.exceptions import NotFoundError, PermissionError, ValidationError
 from app.utils.pagination import paginate
+from app.utils.rating import apply_rating, revert_rating
 
 _shop_schema = ShopSchema()
 _shop_list_schema = ShopSchema(many=True)
@@ -78,54 +80,88 @@ class ShopService:
 
     # ---- 评价 ----
     @staticmethod
+    def list_reviews_page(query, params: dict) -> dict:
+        """评价列表的公共收尾：分页 + 装填回复预览 + 序列化。
+
+        菜品页的「菜品评价」就是加了 dish_id 过滤的同一份评价，所以 DishService 也调这里，
+        免得回复预览的装填逻辑写两遍。
+        """
+        page = int(params.get('page') or 1)
+        page_size = int(params.get('page_size') or 10)
+        result = paginate(query, page, page_size)
+        # 先装填预览，序列化时每条评价的 _replies / _reply_count 才拿得到数据
+        CommentService.attach_reply_previews([rv.id for rv in result['items']], 'review')
+        return {**result, 'items': _review_list_schema.dump(result['items'])}
+
+    @staticmethod
     def list_reviews(shop_id: int, params: dict) -> dict:
         """店铺评价列表（分页，按时间倒序）。"""
         _get_active_shop(shop_id)
         query = Review.query.filter_by(shop_id=shop_id).order_by(Review.created_at.desc(), Review.id.desc())
-        page = int(params.get('page') or 1)
-        page_size = int(params.get('page_size') or 10)
-        result = paginate(query, page, page_size)
-        return {**result, 'items': _review_list_schema.dump(result['items'])}
+        return ShopService.list_reviews_page(query, params)
+
+    @staticmethod
+    def _resolve_dish(shop: Shop, dish_id):
+        """校验关联菜品：必须存在、属于本店、在售且审核通过。
+
+        不复用 dish_service._get_active_dish()：它抛的是 NotFoundError(4043, '菜品不存在')，
+        对表单里的一个非法取值来说错误码和提示都不对，而且这里 shop 已经校验过了。
+        """
+        if not dish_id:  # None / 0 / ''（el-select 清空时会发空串）一律视为未关联
+            return None
+        dish = Dish.query.get(int(dish_id))
+        if dish is None or dish.shop_id != shop.id:
+            raise ValidationError(message='关联菜品不属于该店铺', code=4000)
+        if not dish.is_active or dish.status != 'approved':
+            raise ValidationError(message='关联菜品不可用', code=4000)
+        return dish
 
     @staticmethod
     def add_review(user, shop_id: int, data: dict) -> dict:
-        """发表评价，并更新店铺平均分。"""
+        """发表评价，并更新店铺平均分（关联了菜品时同时更新该菜品平均分）。"""
         shop = _get_active_shop(shop_id)
+        # 走一遍请求 Schema：rating 必填、images 上限 9 张（与前端 MultiImageField 的 max 对齐）、
+        # dish_id 归一成 int。此前这里直接读裸 dict，Schema 形同虚设。
+        # marshmallow 的校验错误由 errors/handlers.py 统一转成 4000。
+        data = ReviewCreateSchema().load(data)
         rating = int(data.get('rating') or 0)
         if rating < 1 or rating > 5:
             raise ValidationError(message='评分需在 1-5 之间', code=4000)
+        dish = ShopService._resolve_dish(shop, data.get('dish_id'))
 
         review = Review(
             user_id=user.id,
             shop_id=shop.id,
+            dish_id=dish.id if dish else None,
             rating=rating,
             content=(data.get('content') or '').strip() or None,
             images=json.dumps(data.get('images') or [], ensure_ascii=False),
         )
-        # 增量更新店铺平均分（保留浮点全精度，dump 时再四舍五入，避免反复加减漂移）
-        shop.rating_count += 1
-        shop.avg_rating = (shop.avg_rating * (shop.rating_count - 1) + rating) / shop.rating_count
+        apply_rating(shop, rating)
+        # 关联菜品的评价同时计入店铺和菜品：店铺头部的 rating_count 与评价列表的
+        # 分页 total 必须一致，否则同一页上两处数字对不上，用户一眼就能看出来。
+        if dish is not None:
+            apply_rating(dish, rating)
         db.session.add(review)
         db.session.commit()
         return _review_schema.dump(review)
 
     @staticmethod
     def delete_review(user, review_id: int) -> None:
-        """删除自己的某条评价（含店铺均分回退）。"""
+        """删除自己的某条评价（含均分回退，并清掉其回复与点赞）。"""
         review = Review.query.get(review_id)
         if review is None:
             raise NotFoundError(message='评价不存在', code=4042)
         if review.user_id != user.id and user.role != 'admin':
             raise PermissionError(message='无权删除该评价', code=4030)
 
-        # 回退平均分（对增量加分的逆向，保留浮点全精度）
-        shop = review.shop
-        if shop is not None and shop.rating_count > 1:
-            shop.rating_count -= 1
-            shop.avg_rating = (shop.avg_rating * (shop.rating_count + 1) - review.rating) / shop.rating_count
-        elif shop is not None:
-            shop.rating_count = 0
-            shop.avg_rating = 0.0
+        # 先把 shop/dish 取出来：delete 之后 review.shop / review.dish 会失效
+        shop, dish = review.shop, review.dish
+        if shop is not None:
+            revert_rating(shop, review.rating)
+        if dish is not None:
+            revert_rating(dish, review.rating)
+        CommentService.purge_for_review(review.id)
         db.session.delete(review)
         db.session.commit()
 

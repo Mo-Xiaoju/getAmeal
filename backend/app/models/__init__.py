@@ -5,6 +5,7 @@
 from app.models.circle import Circle
 from app.models.circle_membership import CircleMembership
 from app.models.comment import Comment
+from app.models.comment_like import CommentLike
 from app.models.dish import Dish
 from app.models.event_log import EventLog
 from app.models.favorite import Favorite
@@ -20,6 +21,6 @@ from app.models.view_history import ViewRecord
 
 __all__ = [
     'User', 'School', 'Shop', 'Dish', 'Review', 'Favorite', 'Message',
-    'Post', 'Comment', 'Like', 'UserFollow', 'Circle', 'CircleMembership',
-    'ViewRecord', 'EventLog',
+    'Post', 'Comment', 'CommentLike', 'Like', 'UserFollow', 'Circle',
+    'CircleMembership', 'ViewRecord', 'EventLog',
 ]

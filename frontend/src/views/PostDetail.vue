@@ -157,23 +157,8 @@
         </div>
         <div v-else class="comment-list">
           <el-empty v-if="!postStore.comments.length" description="暂无评论，抢个沙发" />
-          <div v-for="c in postStore.comments" :key="c.id" class="comment-item">
-            <el-avatar
-              class="user-link"
-              :size="34"
-              :src="c.avatar_url || undefined"
-              @click="goUser(c.user_id)"
-            >
-              {{ (c.nickname || 'U').charAt(0) }}
-            </el-avatar>
-            <div class="comment-body">
-              <div class="comment-head">
-                <span class="comment-nickname">{{ c.nickname || '匿名用户' }}</span>
-                <span class="comment-time">{{ formatDate(c.created_at) }}</span>
-              </div>
-              <p class="comment-content">{{ c.content }}</p>
-            </div>
-          </div>
+          <!-- 点赞/回复就地改 comment 对象（见 CommentItem），不重载列表 -->
+          <CommentItem v-for="c in postStore.comments" :key="c.id" :comment="c" />
         </div>
       </section>
     </div>
@@ -186,6 +171,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Shop } from '@element-plus/icons-vue'
 
+import CommentItem from '@/components/CommentItem.vue'
 import LoginHint from '@/components/LoginHint.vue'
 import StarIcon from '@/components/StarIcon.vue'
 import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
@@ -432,38 +418,5 @@ onMounted(async () => {
 .comment-list {
   min-height: 60px;
 }
-.comment-item {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid #f2f3f5;
-}
-.comment-item:last-child {
-  border-bottom: none;
-}
-.comment-body {
-  flex: 1;
-  min-width: 0;
-}
-.comment-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.comment-nickname {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-.comment-time {
-  font-size: 12px;
-  color: #c0c4cc;
-}
-.comment-content {
-  margin: 0;
-  font-size: 14px;
-  color: #606266;
-  line-height: 1.7;
-}
+/* 单条评论的样式在 CommentItem.vue，这里只留列表容器 */
 </style>

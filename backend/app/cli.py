@@ -23,6 +23,7 @@ from app.models import (
     Circle,
     CircleMembership,
     Comment,
+    CommentLike,
     Dish,
     EventLog,
     Favorite,
@@ -35,6 +36,7 @@ from app.models import (
     User,
     UserFollow,
 )
+from app.utils.rating import apply_rating
 
 
 def register_cli(app) -> None:
@@ -565,8 +567,7 @@ def register_cli(app) -> None:
         make_shop('虚拟已下架面馆', '面食', 4.9, 500, 40, active=False)                # 反例：下架必须被排除
 
         # 幽灵评审给陷阱店刷那一条 5.0（用服务层公式从 0 起步，保证 review 行与均分一致）
-        salad.rating_count += 1
-        salad.avg_rating = (salad.avg_rating * (salad.rating_count - 1) + 5) / salad.rating_count
+        apply_rating(salad, 5)
         db.session.add(Review(user_id=ghost.id, shop_id=salad.id, rating=5, content='新店试吃，环境干净味道在线。'))
 
         # ---- 菜品：tags 用规范 token；奶茶店 avg 压低让「父店偏好 + 标签重合」主导 ----
@@ -608,9 +609,11 @@ def register_cli(app) -> None:
             ],
         }
         dish_count = 0
+        dishes = {}   # shop.id -> [Dish]（顺序与 dish_defs 一致；下面关联菜品的评价要用）
         for shop, defs in dish_defs.items():
+            dishes[shop.id] = []
             for name, price, tags, avg, count, created_days in defs:
-                db.session.add(Dish(
+                dish = Dish(
                     shop_id=shop.id,
                     name=name,
                     price=price,
@@ -620,7 +623,11 @@ def register_cli(app) -> None:
                     description=f'{shop.name}招牌',
                     image_url=f'https://picsum.photos/seed/vdish-{len(dish_defs)}{name}/400/300',
                     created_at=days_ago(created_days),
-                ))
+                )
+                db.session.add(dish)
+                # 立刻 flush：下面 add_review(dish=...) 要拿 dish.id，而 flush 之前是 None
+                db.session.flush()
+                dishes[shop.id].append(dish)
                 dish_count += 1
 
         # ---- 探店笔记（作者/热度/新旧错开；tags 为规范 token 供画像标签重合）----
@@ -654,11 +661,48 @@ def register_cli(app) -> None:
             posts.append(post)
 
         # ---- 行为（画像证据：收藏店 / 好评店 / 点赞·收藏帖 / 关注作者）----
-        def add_review(user, shop, rating, content='好吃，值得再刷！'):
-            """行为 Review 落库时同步按服务层公式维护店铺均分。"""
-            shop.rating_count += 1
-            shop.avg_rating = (shop.avg_rating * (shop.rating_count - 1) + rating) / shop.rating_count
-            db.session.add(Review(user_id=user.id, shop_id=shop.id, rating=rating, content=content))
+        def add_review(user, shop, rating, content='好吃，值得再刷！', dish=None):
+            """行为 Review 落库时同步按服务层公式维护均分。
+
+            关联 dish 时同时计入菜品均分——与 ShopService.add_review 保持一致；
+            这些关联菜品的评价就是菜品页「菜品评价」的全部数据来源。
+            """
+            review = Review(
+                user_id=user.id,
+                shop_id=shop.id,
+                dish_id=dish.id if dish is not None else None,
+                rating=rating,
+                content=content,
+            )
+            apply_rating(shop, rating)
+            if dish is not None:
+                apply_rating(dish, rating)
+            db.session.add(review)
+            db.session.flush()   # 下面加回复/点赞要用 review.id
+            return review
+
+        def add_reply(user, review, content, parent=None):
+            """给评价加一条回复或子回复（两层：子回复挂在根上，被回复人进 reply_to_user_id）。"""
+            comment = Comment(
+                review_id=review.id,
+                user_id=user.id,
+                parent_id=(parent.parent_id or parent.id) if parent is not None else None,
+                reply_to_user_id=parent.user_id if parent is not None else None,
+                content=content,
+            )
+            db.session.add(comment)
+            db.session.flush()
+            return comment
+
+        def add_review_like(user, review):
+            """点赞评价：like 行与 like_count 一起写（同 CommentService.toggle_review_like）。"""
+            db.session.add(Like(user_id=user.id, review_id=review.id))
+            review.like_count += 1
+
+        def add_comment_like(user, comment):
+            """点赞评论/回复：同 CommentService.toggle_comment_like。"""
+            db.session.add(CommentLike(user_id=user.id, comment_id=comment.id))
+            comment.like_count += 1
 
         def add_favorite_shop(user, shop):
             db.session.add(Favorite(user_id=user.id, shop_id=shop.id))
@@ -666,7 +710,9 @@ def register_cli(app) -> None:
         # rec_spicy（无辣不欢）：川菜偏好
         add_favorite_shop(spicy, laojie)
         add_favorite_shop(spicy, bashu)
-        add_review(spicy, maocai, 5, '冒菜香辣过瘾，一个人也能吃得爽。')
+        rv_maocai = add_review(spicy, maocai, 5, '冒菜香辣过瘾，一个人也能吃得爽。')
+        rv_beef = add_review(spicy, laojie, 5, '水煮牛肉够麻够辣，肉片给得实在。',
+                             dish=dishes[laojie.id][0])   # 水煮牛肉
         db.session.add(Like(user_id=spicy.id, post_id=posts[1].id))     # 川菜帖
         db.session.add(Favorite(user_id=spicy.id, post_id=posts[2].id))  # 川菜帖
         db.session.add(UserFollow(follower_id=spicy.id, followee_id=author1.id))
@@ -675,18 +721,34 @@ def register_cli(app) -> None:
         add_favorite_shop(milk, naigai)
         add_favorite_shop(milk, boba)
         add_review(milk, yikoutian, 5, '奶味足、不齁甜，续命神器。')
+        rv_milktea = add_review(milk, naigai, 5, '黑糖珍珠很Q，奶味扎实，下午茶首选。',
+                                dish=dishes[naigai.id][0])   # 黑糖珍珠奶茶
         db.session.add(Like(user_id=milk.id, post_id=posts[4].id))      # 奶茶帖
         db.session.add(Favorite(user_id=milk.id, post_id=posts[5].id))  # 奶茶帖
         db.session.add(UserFollow(follower_id=milk.id, followee_id=author2.id))
+
+        # ---- 评价的回复与点赞（菜品页/店铺页的新 UI 得有数据才看得出效果）----
+        r1 = add_reply(author1, rv_beef, '谢谢捧场！下次来给你多切两片肉。')
+        r2 = add_reply(spicy, rv_beef, '就冲这句话下周还来～', parent=r1)   # 子回复，验证两层 + @
+        r3 = add_reply(author2, rv_milktea, '黑糖是我们自己熬的，欢迎再来！')
+
+        add_review_like(milk, rv_beef)      # 评价点赞 → rv_beef.like_count = 2
+        add_review_like(author2, rv_beef)
+        add_review_like(spicy, rv_milktea)
+        add_comment_like(author1, r2)       # 回复点赞
+        add_comment_like(spicy, r3)
 
         # rec_cold：零行为（冷启动对照）
 
         db.session.commit()
 
         active_shops = Shop.query.filter_by(school_id=school.id, is_active=True, status='approved').count()
+        reviews = Review.query.filter(Review.shop_id.in_([s.id for s in shops])).count()
+        replies = Comment.query.filter(Comment.review_id.isnot(None)).count()
         print(
             f'seed-rec-demo 完成：学校「{school.name}」+ 7 名演示账号（密码 demo1234）；'
-            f'启用店铺 {active_shops} 家、菜品 {dish_count} 道、笔记 {len(posts)} 篇。'
+            f'启用店铺 {active_shops} 家、菜品 {dish_count} 道、笔记 {len(posts)} 篇、'
+            f'评价 {reviews} 条（含关联菜品）、回复 {replies} 条与对应点赞。'
         )
         print('用法：进入首页选「虚拟演示大学」，用 rec_spicy / rec_milk / rec_cold 登录对比三轨推荐差异。')
 

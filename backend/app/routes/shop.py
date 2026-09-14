@@ -56,8 +56,13 @@ def get_shop_detail(shop_id):
 
 
 @bp_shop.route('/<int:shop_id>/reviews', methods=['GET'])
+@optional_login
 def get_shop_reviews(shop_id):
-    """店铺评价列表（分页）。"""
+    """店铺评价列表（分页，带登录态时回显点赞/回复状态）。
+
+    必须挂 @optional_login：列表里每条评价的 liked 字段靠 g.current_user 判定，
+    不解析 token 的话已登录用户拿到的点赞态会全是 false。
+    """
     params = request.args.to_dict()
     return ok(ShopService.list_reviews(shop_id, params))
 
