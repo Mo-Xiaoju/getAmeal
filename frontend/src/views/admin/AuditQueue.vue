@@ -114,6 +114,67 @@
           />
         </div>
       </el-tab-pane>
+
+      <!-- 认领审核：商户申请认领无主店铺，通过后店铺归属转移给申请人 -->
+      <el-tab-pane :label="`认领审核`" name="claims" lazy>
+        <div class="pane-head">
+          <span class="pane-hint">
+            商户申请认领「已公开但无商户入驻」的店铺；通过后店铺归该商户所有，同店其余待审申请将自动驳回
+          </span>
+          <el-button size="small" :icon="Refresh" @click="loadClaims(1)">刷新</el-button>
+        </div>
+        <el-table v-loading="claimsLoading" :data="claimList" stripe size="small">
+          <el-table-column label="申请店铺" min-width="180">
+            <template #default="{ row }">
+              <div class="claim-shop">{{ row.shop?.name || '-' }}</div>
+              <div class="claim-sub">{{ row.shop?.address }}</div>
+              <div v-if="row.shop?.owner_nickname" class="claim-sub">
+                当前归属：{{ row.shop.owner_nickname }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="申请人" min-width="140">
+            <template #default="{ row }">{{ submitterText(row.applicant) }}</template>
+          </el-table-column>
+          <el-table-column label="申请理由" min-width="160">
+            <template #default="{ row }">
+              <span :class="{ 'claim-sub': !row.reason }">{{ row.reason || '（未填写）' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="同店待审" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.pending_claim_count > 1" size="small" type="warning" effect="plain">
+                {{ row.pending_claim_count }} 份
+              </el-tag>
+              <span v-else class="claim-sub">1 份</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="申请时间" width="150">
+            <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" type="success" :loading="actingClaim === row.id" @click="approveClaim(row)">
+                通过
+              </el-button>
+              <el-button size="small" type="danger" plain :loading="actingClaim === row.id" @click="rejectClaim(row)">
+                驳回
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!claimsLoading && !claimList.length" description="暂无待审认领申请" />
+        <div v-if="claimTotal > pageSize" class="pagination-wrap">
+          <el-pagination
+            background
+            layout="prev, pager, next, total"
+            :total="claimTotal"
+            :page-size="pageSize"
+            :current-page="claimPage"
+            @current-change="loadClaims"
+          />
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -127,7 +188,9 @@ import {
   bulkReviewShop,
   getAuditDishes,
   getAuditShops,
+  getClaimApplications,
   reclassifyShopCategory,
+  reviewClaim,
   reviewDish,
 } from '@/api/admin'
 import { useCategoryStore } from '@/store/category'
@@ -188,13 +251,15 @@ const formatTime = (iso) => {
 }
 
 // 驳回需填写原因
-const promptReason = () =>
+const promptReason = (
+  placeholder = '例如：信息不完整 / 图片不清晰 / 与已有店铺重复'
+) =>
   ElMessageBox.prompt('请填写驳回原因，提交者将看到该说明', '驳回', {
     confirmButtonText: '确定驳回',
     cancelButtonText: '取消',
     inputType: 'textarea',
     inputValidator: (v) => (v && v.trim() ? true : '请填写驳回原因'),
-    inputPlaceholder: '例如：信息不完整 / 图片不清晰 / 与已有店铺重复',
+    inputPlaceholder: placeholder,
   }).then(({ value }) => value.trim())
 
 const bulkApprove = async (shop) => {
@@ -271,11 +336,75 @@ const rejectDish = async (row) => {
   }
 }
 
+// ---- 认领申请队列 ----
+const claimsLoading = ref(false)
+const claimList = ref([])
+const claimTotal = ref(0)
+const claimPage = ref(1)
+const actingClaim = ref(null)
+
+const loadClaims = async (p = claimPage.value) => {
+  claimsLoading.value = true
+  try {
+    const res = await getClaimApplications({ status: 'pending', page: p, page_size: pageSize })
+    const data = res.data.data
+    claimList.value = data.items || []
+    claimTotal.value = data.total || 0
+    claimPage.value = data.page || p
+  } finally {
+    claimsLoading.value = false
+  }
+}
+
+const approveClaim = async (row) => {
+  const name = row.shop?.name || '该店铺'
+  // 同店还有别的待审申请时，先提醒「择一即意味着驳回其余」
+  if (row.pending_claim_count > 1) {
+    try {
+      await ElMessageBox.confirm(
+        `「${name}」还有 ${row.pending_claim_count - 1} 份待审认领申请，通过后将一并驳回。确定通过？`,
+        '通过认领申请',
+        { type: 'warning', confirmButtonText: '确定通过', cancelButtonText: '取消' }
+      )
+    } catch (e) {
+      return // 用户取消
+    }
+  }
+  actingClaim.value = row.id
+  try {
+    await reviewClaim(row.id, { action: 'approve' })
+    ElMessage.success(`已通过「${name}」的认领申请`)
+    loadClaims()
+  } finally {
+    actingClaim.value = null
+  }
+}
+
+const rejectClaim = async (row) => {
+  let reason
+  try {
+    reason = await promptReason('例如：资质不符 / 申请人非本店经营者 / 店铺信息有误')
+  } catch (e) {
+    return
+  }
+  actingClaim.value = row.id
+  try {
+    await reviewClaim(row.id, { action: 'reject', reason })
+    ElMessage.success('已驳回该认领申请')
+    loadClaims()
+  } finally {
+    actingClaim.value = null
+  }
+}
+
 onMounted(loadShops)
 
 watch(tab, (newTab) => {
   if (newTab === 'dishes' && !dishList.value.length && !dishesLoading.value) {
     loadDishes()
+  }
+  if (newTab === 'claims' && !claimList.value.length && !claimsLoading.value) {
+    loadClaims()
   }
 })
 </script>
@@ -378,6 +507,14 @@ watch(tab, (newTab) => {
 .dish-cell {
   font-weight: 600;
   color: #303133;
+}
+.claim-shop {
+  font-weight: 600;
+  color: #303133;
+}
+.claim-sub {
+  font-size: 12px;
+  color: #909399;
 }
 .price {
   color: #f56c6c;

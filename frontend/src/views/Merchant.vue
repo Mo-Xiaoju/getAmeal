@@ -10,11 +10,12 @@
           :icon="Link"
           plain
           :disabled="!schoolStore.hasSchool"
-          :title="schoolStore.hasSchool ? '认领校园内已公开但尚未入驻的店铺' : '请先选择所在学校'"
+          :title="schoolStore.hasSchool ? '申请认领校园内已公开但尚未入驻的店铺（需管理员审核）' : '请先选择所在学校'"
           @click="openClaimDialog"
         >
           认领已有店铺
         </el-button>
+        <el-button plain @click="openMyClaimsDialog">我的认领申请</el-button>
         <el-button type="primary" :icon="Plus" @click="openShopDialog()">新建店铺</el-button>
       </div>
     </div>
@@ -151,11 +152,11 @@
       </div>
     </el-drawer>
 
-    <!-- 认领已有店铺 -->
-    <el-dialog v-model="claimDialog.show" title="认领已有店铺" width="680px">
+    <!-- 认领已有店铺（提交申请，需管理员审核） -->
+    <el-dialog v-model="claimDialog.show" title="认领已有店铺（需管理员审核）" width="680px">
       <p class="claim-tip">
-        选择一家当前学校内「已公开且尚未有商户入驻」的店铺挂到你名下；认领后即可在商户中心直接管理其菜单。
-        同学仍可向该店补充菜品，但会进入审核，管理员通过后才会对外展示。
+        选择一家当前学校内「已公开且尚未有商户入驻」的店铺提交认领申请；<strong>管理员审核通过后</strong>店铺才会归到你名下，
+        届时即可在商户中心直接管理其菜单。同学仍可向该店补充菜品，但会进入审核，管理员通过后才会对外展示。
       </p>
       <div v-loading="claimLoading" class="claim-list">
         <div v-for="shop in claimableShops" :key="shop.id" class="claim-item">
@@ -176,19 +177,72 @@
                 <span>{{ shop.address }}</span>
                 <span>{{ shop.dish_count }} 道菜</span>
               </div>
+              <div v-if="shop.my_claim_status === 'rejected'" class="claim-note rejected">
+                你上次的认领申请未通过，可重新申请
+              </div>
+              <div v-else-if="shop.my_claim_status === 'pending'" class="claim-note">
+                已提交申请，等待管理员审核
+              </div>
+              <div v-else-if="shop.pending_claim_count > 0" class="claim-note">
+                另有 {{ shop.pending_claim_count }} 位商户在申请该店
+              </div>
             </div>
           </div>
           <el-button
             type="primary"
             plain
             size="small"
+            :disabled="shop.my_claim_status === 'pending'"
             :loading="claimingId === shop.id"
             @click="handleClaim(shop)"
           >
-            认领
+            {{ shop.my_claim_status === 'pending' ? '已申请' : '申请认领' }}
           </el-button>
         </div>
         <el-empty v-if="!claimLoading && !claimableShops.length" description="当前学校暂无待认领店铺" />
+      </div>
+    </el-dialog>
+
+    <!-- 我的认领申请（状态跟踪 / 撤回） -->
+    <el-dialog v-model="myClaimsDialog.show" title="我的认领申请" width="720px">
+      <div v-loading="myClaimsLoading" class="claim-list">
+        <el-table v-if="myClaims.length" :data="myClaims" stripe size="small">
+          <el-table-column label="店铺" min-width="150">
+            <template #default="{ row }">{{ row.shop?.name || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="claimStatusType(row.status)" effect="light">
+                {{ claimStatusText(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="申请时间" width="150">
+            <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+          </el-table-column>
+          <el-table-column label="审核意见" min-width="160">
+            <template #default="{ row }">
+              <span :class="{ 'claim-note': !row.review_reason }">
+                {{ row.review_reason || (row.status === 'pending' ? '等待审核中' : '-') }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.status === 'pending'"
+                size="small"
+                type="danger"
+                plain
+                :loading="cancellingId === row.id"
+                @click="handleCancelClaim(row)"
+              >
+                撤回
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else-if="!myClaimsLoading" description="还没有认领申请" />
       </div>
     </el-dialog>
   </div>
@@ -201,12 +255,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Link, Plus, Shop } from '@element-plus/icons-vue'
 
 import {
-  claimShop,
+  applyClaim,
+  cancelClaim,
   createDish,
   createShop,
   deleteDish,
   deleteShop,
   getClaimableShops,
+  getMyClaims,
   getMyShops,
   getShopDishes,
   updateDish,
@@ -325,14 +381,86 @@ const openClaimDialog = async () => {
 }
 
 const handleClaim = async (shop) => {
+  // 申请理由选填：管理员据此判断申请人是否真是店主
+  let reason
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `申请认领「${shop.name}」。可补充说明你与该店的关系，便于管理员审核（选填）。`,
+      '提交认领申请',
+      {
+        confirmButtonText: '提交申请',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '例如：本店经营者本人 / 已获得店主授权',
+      }
+    )
+    reason = (value || '').trim()
+  } catch (e) {
+    return // 用户取消
+  }
   claimingId.value = shop.id
   try {
-    await claimShop(shop.id)
-    ElMessage.success(`已认领「${shop.name}」`)
-    claimableShops.value = claimableShops.value.filter((s) => s.id !== shop.id)
-    loadShops()
+    await applyClaim(shop.id, { reason: reason || undefined })
+    ElMessage.success('认领申请已提交，等待管理员审核')
+    shop.my_claim_status = 'pending' // 就地更新，避免整表重拉
   } finally {
     claimingId.value = null
+  }
+}
+
+// ---- 我的认领申请 ----
+const myClaimsDialog = reactive({ show: false })
+const myClaimsLoading = ref(false)
+const myClaims = ref([])
+const cancellingId = ref(null)
+
+const claimStatusText = (s) =>
+  ({ pending: '待审核', approved: '已通过', rejected: '已驳回' }[s] || s || '-')
+const claimStatusType = (s) =>
+  ({ pending: 'warning', approved: 'success', rejected: 'danger' }[s] || 'info')
+
+const formatTime = (iso) => {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return (
+    d.toLocaleDateString('zh-CN') +
+    ' ' +
+    d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  )
+}
+
+const loadMyClaims = async () => {
+  myClaimsLoading.value = true
+  try {
+    const res = await getMyClaims({ page: 1, page_size: 50 })
+    myClaims.value = res.data.data.items || []
+  } finally {
+    myClaimsLoading.value = false
+  }
+}
+
+const openMyClaimsDialog = () => {
+  myClaimsDialog.show = true
+  loadMyClaims()
+}
+
+const handleCancelClaim = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定撤回对「${row.shop?.name || '该店铺'}」的认领申请？撤回后可重新提交。`,
+      '撤回申请',
+      { type: 'warning', confirmButtonText: '确定撤回', cancelButtonText: '取消' }
+    )
+  } catch (e) {
+    return
+  }
+  cancellingId.value = row.id
+  try {
+    await cancelClaim(row.id)
+    ElMessage.success('已撤回')
+    loadMyClaims()
+  } finally {
+    cancellingId.value = null
   }
 }
 
@@ -642,5 +770,14 @@ onMounted(() => {
   margin-top: 4px;
   font-size: 13px;
   color: #909399;
+}
+/* 认领状态提示：申请中 / 上次未通过 / 他人竞争 */
+.claim-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+.claim-note.rejected {
+  color: #f56c6c;
 }
 </style>

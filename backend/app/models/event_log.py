@@ -11,6 +11,8 @@ class EventLog(db.Model):
         shop_submit / dish_submit         提交店铺 / 菜品
         shop_approve / shop_reject        店铺审核通过 / 驳回
         dish_approve / dish_reject        菜品审核通过 / 驳回
+        shop_claim_submit                 商户提交店铺认领申请
+        shop_claim_approve / shop_claim_reject   认领申请通过 / 驳回
         post_create                       发布探店笔记
     """
 
@@ -20,7 +22,7 @@ class EventLog(db.Model):
     actor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
     actor_role = db.Column(db.String(16), nullable=True)   # student | merchant | admin（冗余便于聚合）
     event_type = db.Column(db.String(50), nullable=False, index=True)
-    target_type = db.Column(db.String(16), nullable=True)  # shop | dish | post
+    target_type = db.Column(db.String(16), nullable=True)  # shop | dish | post | claim
     target_id = db.Column(db.Integer, nullable=True, index=True)
     school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True, index=True)
     extra = db.Column(db.Text, nullable=True)              # JSON 字符串（店铺名/分类/驳回原因等）

@@ -154,6 +154,31 @@ class MessageService:
             db.session.rollback()
             current_app.logger.exception('官方助手自动回复失败')
 
+    @staticmethod
+    def send_system_notice(recipient: User, content: str) -> None:
+        """以官方助手身份给某个用户发一条站内通知（落库 + 实时广播）。
+
+        用于审核结果等系统事件触达：仓库没有独立的通知模型，官方助手私信
+        是既有的、用户一定会看到的通道，复用它可以避免新造一套已读/未读体系。
+
+        与 _reply_as_bot 同样就地吞掉异常——通知失败绝不能让调用方的业务
+        （如认领审核）失败；机器人账号未 seed 时静默跳过。
+        """
+        try:
+            bot = BotService.get_bot()
+            if bot is None or recipient is None or recipient.id == bot.id:
+                return
+            notice = Message(user_id=bot.id, recipient_id=recipient.id, content=(content or '')[:1000])
+            db.session.add(notice)
+            db.session.commit()
+            sio.emit('message', {
+                'channel': {'type': 'dm', 'id': bot.id},
+                'message': _message_schema.dump(notice),
+            }, to=f'user_{recipient.id}')
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception('站内通知发送失败')
+
     # ---- 圈子群聊历史 ----
     @staticmethod
     def circle_messages(circle_id: int, params: dict) -> dict:

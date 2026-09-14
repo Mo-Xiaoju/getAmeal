@@ -16,11 +16,12 @@ from app.models.post import Post
 from app.models.review import Review
 from app.models.school import School
 from app.models.shop import Shop
+from app.models.shop_claim import ShopClaim
 from app.models.user import User
 from app.models.view_history import ViewRecord
 
 __all__ = [
     'User', 'School', 'Shop', 'Dish', 'Review', 'Favorite', 'Message',
     'Post', 'Comment', 'CommentLike', 'Like', 'UserFollow', 'Circle',
-    'CircleMembership', 'ViewRecord', 'EventLog',
+    'CircleMembership', 'ViewRecord', 'EventLog', 'ShopClaim',
 ]

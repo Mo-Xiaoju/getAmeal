@@ -2,6 +2,7 @@
 from flask import Blueprint, g, request
 
 from app.services.admin_service import AdminService
+from app.services.claim_service import ClaimService
 from app.utils.decorators import require_admin
 from app.utils.exceptions import ValidationError
 from app.utils.responses import ok
@@ -105,6 +106,23 @@ def admin_review_dish(dish_id):
     """单菜品审核（通过 / 驳回）。"""
     data = request.get_json(silent=True) or {}
     return ok(AdminService.review_dish(g.current_user, dish_id, data), message='审核完成')
+
+
+# ---- 店铺认领审核 ----
+@bp_admin.route('/audits/claims', methods=['GET'])
+@require_admin
+def admin_audit_claims():
+    """认领申请队列（status 默认 pending）。"""
+    params = request.args.to_dict()
+    return ok(ClaimService.list_for_admin(params))
+
+
+@bp_admin.route('/audits/claims/<int:claim_id>/review', methods=['POST'])
+@require_admin
+def admin_review_claim(claim_id):
+    """审核认领申请（通过后店铺归属转移给申请人）。"""
+    data = request.get_json(silent=True) or {}
+    return ok(ClaimService.review(g.current_user, claim_id, data), message='审核完成')
 
 
 @bp_admin.route('/stats', methods=['GET'])

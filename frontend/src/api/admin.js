@@ -25,6 +25,13 @@ export const reclassifyShopCategory = (shopId, category) => request.put(`/admin/
 // 审核单道菜品，data: { action, reason? }
 export const reviewDish = (dishId, data) => request.post(`/admin/audits/dishes/${dishId}/review`, data)
 
+// ---- 店铺认领审核（商户申请认领无主店铺）----
+// 认领申请队列，params: { status, page, page_size }，status 默认 pending
+export const getClaimApplications = (params) => request.get('/admin/audits/claims', { params })
+// 审核认领申请，data: { action: 'approve'|'reject', reason? }
+// 通过后店铺归属转移给申请人，同店其余待审申请自动驳回
+export const reviewClaim = (claimId, data) => request.post(`/admin/audits/claims/${claimId}/review`, data)
+
 // ---- 数据统计（埋点看板）----
 // 统计聚合：params { days? }，返回 summary/trend/by_type/by_school
 export const getAdminStats = (params) => request.get('/admin/stats', { params })

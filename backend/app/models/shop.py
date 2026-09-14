@@ -41,6 +41,7 @@ class Shop(db.Model):
     reviewer = db.relationship('User', foreign_keys=[reviewed_by])
     dishes = db.relationship('Dish', back_populates='shop', lazy='dynamic')
     reviews = db.relationship('Review', back_populates='shop', lazy='dynamic')
+    claims = db.relationship('ShopClaim', back_populates='shop', lazy='dynamic')
 
     @property
     def school_name(self) -> str:
