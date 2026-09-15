@@ -158,6 +158,17 @@
         选择一家当前学校内「已公开且尚未有商户入驻」的店铺提交认领申请；<strong>管理员审核通过后</strong>店铺才会归到你名下，
         届时即可在商户中心直接管理其菜单。同学仍可向该店补充菜品，但会进入审核，管理员通过后才会对外展示。
       </p>
+      <div class="claim-search">
+        <el-input
+          v-model="claimKeyword"
+          placeholder="搜索店铺名称"
+          clearable
+          :prefix-icon="Search"
+          @keyup.enter="loadClaimableShops"
+          @clear="loadClaimableShops"
+        />
+        <el-button :icon="Search" @click="loadClaimableShops">搜索</el-button>
+      </div>
       <div v-loading="claimLoading" class="claim-list">
         <div v-for="shop in claimableShops" :key="shop.id" class="claim-item">
           <div class="claim-info">
@@ -196,10 +207,13 @@
             :loading="claimingId === shop.id"
             @click="handleClaim(shop)"
           >
-            {{ shop.my_claim_status === 'pending' ? '已申请' : '申请认领' }}
+            {{ claimButtonText(shop.my_claim_status) }}
           </el-button>
         </div>
-        <el-empty v-if="!claimLoading && !claimableShops.length" description="当前学校暂无待认领店铺" />
+        <el-empty
+          v-if="!claimLoading && !claimableShops.length"
+          :description="claimKeyword.trim() ? '没有找到匹配的待认领店铺' : '当前学校暂无待认领店铺'"
+        />
       </div>
     </el-dialog>
 
@@ -252,10 +266,9 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Link, Plus, Shop } from '@element-plus/icons-vue'
+import { Link, Plus, Search, Shop } from '@element-plus/icons-vue'
 
 import {
-  applyClaim,
   cancelClaim,
   createDish,
   createShop,
@@ -271,6 +284,7 @@ import {
 import ImageField from '@/components/ImageField.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
 import { openImage } from '@/composables/useImageViewer'
+import { claimButtonText, claimStatusText, claimStatusType, useShopClaim } from '@/composables/useShopClaim'
 import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
 
@@ -364,15 +378,18 @@ const handleDeleteShop = async (shop) => {
 const claimDialog = reactive({ show: false })
 const claimLoading = ref(false)
 const claimableShops = ref([])
-const claimingId = ref(null)
+const claimKeyword = ref('')
+// 认领申请流程与店铺详情页共用（见 composables/useShopClaim.js）
+const { claimingId, applyForClaim: handleClaim } = useShopClaim()
 
-const openClaimDialog = async () => {
-  claimDialog.show = true
+const loadClaimableShops = async () => {
   claimLoading.value = true
   try {
-    const params = schoolStore.hasSchool
-      ? { school_id: schoolStore.currentSchool.id, page_size: 50 }
-      : { page_size: 50 }
+    const params = {
+      page_size: 50,
+      ...(schoolStore.hasSchool ? { school_id: schoolStore.currentSchool.id } : {}),
+      ...(claimKeyword.value.trim() ? { keyword: claimKeyword.value.trim() } : {}),
+    }
     const res = await getClaimableShops(params)
     claimableShops.value = res.data.data.items || []
   } finally {
@@ -380,32 +397,10 @@ const openClaimDialog = async () => {
   }
 }
 
-const handleClaim = async (shop) => {
-  // 申请理由选填：管理员据此判断申请人是否真是店主
-  let reason
-  try {
-    const { value } = await ElMessageBox.prompt(
-      `申请认领「${shop.name}」。可补充说明你与该店的关系，便于管理员审核（选填）。`,
-      '提交认领申请',
-      {
-        confirmButtonText: '提交申请',
-        cancelButtonText: '取消',
-        inputType: 'textarea',
-        inputPlaceholder: '例如：本店经营者本人 / 已获得店主授权',
-      }
-    )
-    reason = (value || '').trim()
-  } catch (e) {
-    return // 用户取消
-  }
-  claimingId.value = shop.id
-  try {
-    await applyClaim(shop.id, { reason: reason || undefined })
-    ElMessage.success('认领申请已提交，等待管理员审核')
-    shop.my_claim_status = 'pending' // 就地更新，避免整表重拉
-  } finally {
-    claimingId.value = null
-  }
+const openClaimDialog = () => {
+  claimDialog.show = true
+  claimKeyword.value = ''
+  loadClaimableShops()
 }
 
 // ---- 我的认领申请 ----
@@ -413,11 +408,6 @@ const myClaimsDialog = reactive({ show: false })
 const myClaimsLoading = ref(false)
 const myClaims = ref([])
 const cancellingId = ref(null)
-
-const claimStatusText = (s) =>
-  ({ pending: '待审核', approved: '已通过', rejected: '已驳回' }[s] || s || '-')
-const claimStatusType = (s) =>
-  ({ pending: 'warning', approved: 'success', rejected: 'danger' }[s] || 'info')
 
 const formatTime = (iso) => {
   if (!iso) return '-'
@@ -715,6 +705,12 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   line-height: 1.7;
+}
+/* 认领弹窗内的店名搜索：输入框占满，搜索按钮紧随其后 */
+.claim-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .claim-list {
   display: flex;

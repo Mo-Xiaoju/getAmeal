@@ -139,7 +139,7 @@ class ClaimService:
     def list_claimable(user, params: dict) -> dict:
         """列出当前商户可认领的店铺，并标注本人申请状态与他人竞争情况。
 
-        可用 school_id 限定当前学校。
+        可用 school_id 限定当前学校，keyword 按店名模糊筛选（与 admin_service.list_shops 同款）。
         """
         query = _claimable_query(user.id).order_by(Shop.id.desc())
         school_id = params.get('school_id')
@@ -148,6 +148,9 @@ class ClaimService:
                 query = query.filter(Shop.school_id == int(school_id))
             except (TypeError, ValueError):
                 pass  # 非法 school_id 视为不限定
+        keyword = (params.get('keyword') or '').strip()
+        if keyword:
+            query = query.filter(Shop.name.like(f'%{keyword}%'))
         page = int(params.get('page') or 1)
         page_size = int(params.get('page_size') or 10)
         result = paginate(query, page, page_size)

@@ -94,10 +94,24 @@
                 补充菜品
               </el-button>
             </template>
-            <!-- 仅本商户的店铺出现管理入口；非本商户的店铺不渲染任何管理按钮 -->
-            <el-button v-else-if="isMyShop" type="primary" :icon="Shop" @click="router.push('/merchant')">
-              管理本店 · 菜单
-            </el-button>
+            <!-- 商户视角：自己的店就地添加菜品（与「补充菜品」同一个弹窗，但提交即发布、不进审核）；
+                 无主的店可就地申请认领（需管理员审核） -->
+            <template v-else>
+              <el-button v-if="isMyShop" type="primary" :icon="Plus" @click="openDishDialog">
+                添加本店菜品
+              </el-button>
+              <el-button
+                v-else-if="canClaim"
+                type="primary"
+                plain
+                :icon="Link"
+                :disabled="shop.my_claim_status === 'pending'"
+                :loading="claimingId === shop.id"
+                @click="handleClaim(shop)"
+              >
+                {{ claimButtonText(shop.my_claim_status) }}
+              </el-button>
+            </template>
           </div>
         </div>
       </div>
@@ -134,7 +148,7 @@
         :description="emptyDishesText"
       >
         <el-button
-          v-if="canContribute"
+          v-if="canAddDish"
           size="small"
           type="primary"
           plain
@@ -142,7 +156,7 @@
           :disabled="guestLocked"
           @click="openDishDialog"
         >
-          补充菜品
+          {{ isMyShop ? '添加菜品' : '补充菜品' }}
         </el-button>
       </el-empty>
     </section>
@@ -217,8 +231,9 @@
       />
     </div>
 
-    <!-- 补充菜品（代已公开店铺补全菜单，审核后展示） -->
-    <el-dialog v-model="dishDialog.show" title="补充菜品" width="480px">
+    <!-- 菜品弹窗：同学补充走审核（标题/文案见 dishDialogTitle、dishDialogTip），
+         本店商户添加则直接发布（后端 /merchant/shops/:id/dishes 创建即 approved） -->
+    <el-dialog v-model="dishDialog.show" :title="dishDialogTitle" width="480px">
       <p class="dish-tip">{{ dishDialogTip }}</p>
       <el-form label-position="top">
         <div class="dish-form-row">
@@ -241,7 +256,9 @@
       </el-form>
       <template #footer>
         <el-button @click="dishDialog.show = false">取消</el-button>
-        <el-button type="primary" :loading="dishDialog.submitting" @click="handleSubmitDish">提交审核</el-button>
+        <el-button type="primary" :loading="dishDialog.submitting" @click="handleSubmitDish">
+          {{ isMyShop ? '添加' : '提交审核' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -251,11 +268,12 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { EditPen, Food, Location, Plus, Shop } from '@element-plus/icons-vue'
+import { EditPen, Food, Link, Location, Plus } from '@element-plus/icons-vue'
 
 import StarIcon from '@/components/StarIcon.vue'
 
 import { submitDish } from '@/api/contribute'
+import { createDish } from '@/api/merchant'
 import DishCard from '@/components/DishCard.vue'
 import LoginHint from '@/components/LoginHint.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
@@ -268,6 +286,7 @@ import ZoneRibbon from '@/components/ZoneRibbon.vue'
 import { useDishStore } from '@/store/dish'
 import { useShopStore } from '@/store/shop'
 import { useUserStore } from '@/store/user'
+import { claimButtonText, useShopClaim } from '@/composables/useShopClaim'
 
 const route = useRoute()
 const router = useRouter()
@@ -299,17 +318,28 @@ const isMyShop = computed(
 const canContribute = computed(
   () => !userStore.isMerchant && shop.value.owner_id !== userStore.userInfo?.id,
 )
-// 弹窗/空态文案：社区店（尚无商户入驻）与商户入驻店分开表述
+// 本店商户就地加菜：与自己「补充菜品」共用同一个弹窗，区别只在提交接口（免审核，直接发布）
+const canAddDish = computed(() => isMyShop.value || canContribute.value)
+// 商户可就地申请认领无主店：详情页只会渲染已公开（approved、在架）的店铺，
+// 因此 community_maintained 为真即等价于「可认领」（详见后端 _claimability_issue）。
+const canClaim = computed(() => userStore.isMerchant && !!shop.value.community_maintained)
+// 认领申请流程与商户中心共用（见 composables/useShopClaim.js）
+const { claimingId, applyForClaim: handleClaim } = useShopClaim()
+// 弹窗/空态文案：本店商户（免审核）、社区店（尚无商户入驻）与商户入驻店分开表述
+const dishDialogTitle = computed(() => (isMyShop.value ? '添加本店菜品' : '补充菜品'))
 const dishDialogTip = computed(() =>
-  shop.value.community_maintained
-    ? '该店尚未有商户入驻，你补充的菜品将进入审核，通过后对外展示。'
-    : '如果店铺菜单更新不及时或漏了菜，你可以帮忙补充；提交后进入审核，通过前不对外展示。',
+  isMyShop.value
+    ? '这是你自己的店铺，添加的菜品将直接对外展示，无需审核。'
+    : shop.value.community_maintained
+      ? '该店尚未有商户入驻，你补充的菜品将进入审核，通过后对外展示。'
+      : '如果店铺菜单更新不及时或漏了菜，你可以帮忙补充；提交后进入审核，通过前不对外展示。',
 )
-const emptyDishesText = computed(() =>
-  canContribute.value ? '本店暂未收录在售菜品，你可以帮店家补充' : '本店暂无在售菜品',
-)
+const emptyDishesText = computed(() => {
+  if (isMyShop.value) return '本店暂无在售菜品，添加一道吧'
+  return canContribute.value ? '本店暂未收录在售菜品，你可以帮店家补充' : '本店暂无在售菜品'
+})
 
-// ---- 补充菜品 ----
+// ---- 菜品弹窗（同学补充 / 本店商户添加，同一套表单）----
 const dishDialog = reactive({
   show: false,
   submitting: false,
@@ -332,16 +362,23 @@ const handleSubmitDish = async () => {
     ElMessage.warning('请输入菜品名')
     return
   }
+  const payload = {
+    name: form.name.trim(),
+    price: form.price,
+    description: form.description?.trim() || undefined,
+    images: form.images,
+    tags: form.tags ? form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
+  }
   dishDialog.submitting = true
   try {
-    await submitDish(shopId.value, {
-      name: form.name.trim(),
-      price: form.price,
-      description: form.description?.trim() || undefined,
-      images: form.images,
-      tags: form.tags ? form.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean) : [],
-    })
-    ElMessage.success('菜品已提交，审核通过后展示')
+    // 本店商户：走商户接口，创建即 approved（不经过审核）
+    if (isMyShop.value) {
+      await createDish(shopId.value, payload)
+      ElMessage.success('菜品已添加')
+    } else {
+      await submitDish(shopId.value, payload)
+      ElMessage.success('菜品已提交，审核通过后展示')
+    }
     dishDialog.show = false
     dishStore.fetchShopDishes(shopId.value)
   } finally {

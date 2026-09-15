@@ -4,7 +4,7 @@ import json
 from flask import g
 from marshmallow import EXCLUDE, Schema, fields, pre_load, validate
 
-from app.models import Favorite
+from app.models import Favorite, ShopClaim
 from app.schemas.comment import CommentSchema
 from app.schemas.interaction import liked_review_ids, reply_preview
 
@@ -77,6 +77,8 @@ class ShopDetailSchema(ShopSchema):
     owner_id = fields.Int()  # 店铺归属（前端据此判定是否展示管理按钮）
     community_maintained = fields.Method('_community_maintained')  # 是否尚未被商户入驻（仅用于文案区分，补充菜品已对全部公开店开放）
     favorited = fields.Method('_favorited')
+    # 当前登录商户对该店的最近一次认领申请状态：pending/approved/rejected，非商户恒为 None
+    my_claim_status = fields.Method('_my_claim_status')
 
     def _community_maintained(self, obj) -> bool:
         """是否尚未被商户入驻（owner 为空或 owner 非商户角色），用于前端展示提示文案。"""
@@ -91,6 +93,21 @@ class ShopDetailSchema(ShopSchema):
         if user is None:
             return False
         return Favorite.query.filter_by(user_id=user.id, shop_id=obj.id).first() is not None
+
+    def _my_claim_status(self, obj):
+        """当前登录商户对该店的最近一次认领申请状态（供店铺详情页的认领按钮判定）。
+
+        仅商户需要这个字段，其它角色恒为 None——省掉非商户视角的一次查询。
+        """
+        user = getattr(g, 'current_user', None)
+        if user is None or user.role != 'merchant':
+            return None
+        claim = (
+            ShopClaim.query.filter_by(shop_id=obj.id, applicant_id=user.id)
+            .order_by(ShopClaim.id.desc())
+            .first()
+        )
+        return claim.status if claim is not None else None
 
 
 class ShopQuerySchema(Schema):
