@@ -158,7 +158,10 @@
           <el-input v-model="shopForm.category" placeholder="如：食堂、奶茶、火锅" />
         </el-form-item>
         <el-form-item label="人均">
-          <el-input v-model="shopForm.price_range" placeholder="如：10-20元" />
+          <PriceRangeField v-model="shopForm.priceRange" />
+          <p v-if="legacyPriceRange" class="price-legacy">
+            当前记录为「{{ legacyPriceRange }}」，不是整数区间；填写后将被替换，留空则清空
+          </p>
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="shopForm.description" type="textarea" rows="3" />
@@ -177,7 +180,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 
@@ -191,6 +194,8 @@ import {
 } from '@/api/admin'
 import { useCategoryStore } from '@/store/category'
 import { useUserStore } from '@/store/user'
+import PriceRangeField from '@/components/PriceRangeField.vue'
+import { formatPriceRange, isValidPriceRange, parsePriceRange } from '@/utils/priceRange'
 
 import AuditQueue from './AuditQueue.vue'
 import AdminStats from './AdminStats.vue'
@@ -222,8 +227,16 @@ const shopForm = ref({
   description: '',
   category: '',
   zone: '',
-  price_range: '',
+  // 人均：{ min, max } 整数区间，提交时转成后端存的 '10-20元'
+  priceRange: { min: null, max: null },
   image_url: '',
+})
+
+// 历史自由文本（如「20元左右」）无法回填成两个整数框：提示管理员，避免误以为已被清空
+const legacyPriceRange = computed(() => {
+  const raw = String(shopForm.value.price_range || '').trim()
+  if (!raw) return ''
+  return parsePriceRange(raw).min === null ? raw : ''
 })
 
 const pageSize = 20
@@ -292,7 +305,7 @@ const loadShops = async (p = pageShops.value) => {
 
 const openShopDialog = (row = null) => {
   if (row) {
-    shopForm.value = { ...row }
+    shopForm.value = { ...row, priceRange: parsePriceRange(row.price_range) }
   } else {
     shopForm.value = {
       id: null,
@@ -302,7 +315,7 @@ const openShopDialog = (row = null) => {
       description: '',
       category: '',
       zone: '',
-      price_range: '',
+      priceRange: { min: null, max: null },
       image_url: '',
     }
   }
@@ -315,6 +328,17 @@ const submitShop = async () => {
     ElMessage.warning('请填写必填项')
     return
   }
+  const range = f.priceRange || { min: null, max: null }
+  if (!isValidPriceRange(range)) {
+    ElMessage.warning(
+      range.min == null || range.max == null
+        ? '人均需同时填写最低价与最高价（整数）'
+        : '人均的最低价不能高于最高价',
+    )
+    return
+  }
+  // 两端留空 = null：新增落空，编辑则清空原值（后端 admin 接口按裸 dict 处理，null 即清空）
+  f.price_range = formatPriceRange(range) || null
   try {
     if (f.id) {
       await updateShop(f.id, f)
@@ -361,6 +385,12 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+}
+.price-legacy {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e6a23c;
 }
 .page-title {
   margin: 0 0 6px;

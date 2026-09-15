@@ -112,7 +112,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="人均区间">
-          <el-input v-model="shopDialog.form.price_range" placeholder="例如：10-20元" />
+          <PriceRangeField v-model="shopDialog.form.priceRange" />
+          <p v-if="legacyPriceRange" class="price-legacy">
+            当前记录为「{{ legacyPriceRange }}」，不是整数区间；填写后将被替换，留空则保持原值
+          </p>
         </el-form-item>
         <el-form-item label="简介">
           <el-input v-model="shopDialog.form.description" type="textarea" :rows="3" />
@@ -242,9 +245,11 @@ import {
 } from '@/api/contribute'
 import ImageField from '@/components/ImageField.vue'
 import MultiImageField from '@/components/MultiImageField.vue'
+import PriceRangeField from '@/components/PriceRangeField.vue'
 import { openImage } from '@/composables/useImageViewer'
 import { useCategoryStore } from '@/store/category'
 import { useSchoolStore } from '@/store/school'
+import { formatPriceRange, isValidPriceRange, parsePriceRange } from '@/utils/priceRange'
 
 const router = useRouter()
 const schoolStore = useSchoolStore()
@@ -262,15 +267,23 @@ const emptyShopForm = () => ({
   address: '',
   category: '',
   zone: '',
-  price_range: '',
+  // 人均区间：{ min, max } 的整数区间，提交时转成后端存的 '10-20元'
+  priceRange: { min: null, max: null },
   description: '',
   image_url: '',
 })
 const shopDialog = reactive({ show: false, form: emptyShopForm() })
 
+// 历史数据里的人均是自由文本（如「20元左右」）时，两个输入框无法回填；提示用户，避免以为已被清空
+const legacyPriceRange = computed(() => {
+  const raw = String(shopDialog.form.price_range || '').trim()
+  if (!raw) return ''
+  return parsePriceRange(raw).min === null ? raw : ''
+})
+
 const openShopDialog = (shop) => {
   shopDialog.form = shop
-    ? { ...shop }
+    ? { ...shop, priceRange: parsePriceRange(shop.price_range) }
     : { ...emptyShopForm(), image_url: `https://picsum.photos/seed/c${Date.now()}/400/300` }
   shopDialog.show = true
 }
@@ -301,6 +314,15 @@ const handleSaveShop = async () => {
     ElMessage.warning('请选择大分类（校内/周边/外卖）')
     return
   }
+  const range = form.priceRange || { min: null, max: null }
+  if (!isValidPriceRange(range)) {
+    ElMessage.warning(
+      range.min == null || range.max == null
+        ? '人均区间需同时填写最低价与最高价（整数）'
+        : '人均区间的最低价不能高于最高价',
+    )
+    return
+  }
   saving.value = true
   try {
     const payload = {
@@ -308,7 +330,8 @@ const handleSaveShop = async () => {
       address: form.address.trim(),
       category: form.category?.trim() || undefined,
       zone: form.zone || undefined,
-      price_range: form.price_range?.trim() || undefined,
+      // 空区间不发该字段：新增落空，编辑则保持原值不动
+      price_range: formatPriceRange(range) || undefined,
       description: form.description?.trim() || undefined,
       // '' 可清除已存封面（后端 update 仅在值非 None 时 setattr）
       image_url: form.image_url?.trim() || '',
@@ -644,6 +667,12 @@ onMounted(() => {
 }
 .review-alert {
   margin-bottom: 14px;
+}
+.price-legacy {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e6a23c;
 }
 .contributed-block {
   margin-top: 28px;
